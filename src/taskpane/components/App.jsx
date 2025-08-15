@@ -18,7 +18,7 @@ const App = () => {
     console.log("App component mounted. Calling Office.onReady...");
     Office.onReady((info) => {
       // Log all properties of the info object for detailed debugging
-      console.log("Office.onReady fired. info object:", info);
+      // console.log("Office.onReady fired. info object:", info);
 
       // Changed condition: Only check for host type. If onReady fires, it's generally initialized enough.
       if (info.host === Office.HostType.Outlook) {
@@ -78,7 +78,7 @@ const App = () => {
     setIsAuthorized(true); // Assume authorized until proven otherwise
     try {
       const item = Office.context.mailbox.item;
-      console.log("Office.context.mailbox.item:", item);
+      // console.log("Office.context.mailbox.item:", item);
 
       if (!item) {
         console.log("No mail item found. Setting analysis result and ending loading.");
@@ -94,17 +94,17 @@ const App = () => {
       const convId = item.conversationId;
       const userEmail = Office.context.mailbox.userProfile.emailAddress;
 
-      console.log("Email Subject:", emailSubject);
-      console.log("Email Sender:", emailSender);
-      console.log("Message ID:", messageId);
-      console.log("User Email:", userEmail);
+      // console.log("Email Subject:", emailSubject);
+      // console.log("Email Sender:", emailSender);
+      // console.log("Message ID:", messageId);
+      // console.log("User Email:", userEmail);
 
       // Get the plain text body asynchronously
       item.body.getAsync(Office.CoercionType.Text, async (asyncResult) => {
-        console.log("item.body.getAsync result status:", asyncResult.status);
+        // console.log("item.body.getAsync result status:", asyncResult.status);
         if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
           const emailBody = asyncResult.value;
-          console.log("Email Body successfully retrieved. Length:", emailBody.length);
+          // console.log("Email Body successfully retrieved. Length:", emailBody.length);
 
           setEmailDetails({
             subject: emailSubject,
@@ -124,7 +124,7 @@ const App = () => {
             conv_id: convId,
             message_id: messageId,
           };
-          console.log("Sending analysis request to Flask:", payloadAnalysis);
+          // console.log("Sending analysis request to Flask:", payloadAnalysis);
           try {
             const responseAnalysis = await fetch(`${FLASK_BASE_URL}/dashboard_data`, {
               method: "POST",
@@ -132,25 +132,25 @@ const App = () => {
               body: JSON.stringify(payloadAnalysis),
             });
 
-            console.log("Flask analysis response status:", responseAnalysis.status);
+            // console.log("Flask analysis response status:", responseAnalysis.status);
             if (responseAnalysis.status === 401) {
               console.warn("User not authorized. Displaying authorization prompt.");
               setIsAuthorized(false); // Set authorization to false
               setAnalysisResult("Authorization required to access AI features.");
             } else if (responseAnalysis.ok) {
               const dataAnalysis = await responseAnalysis.json();
-              console.log("Flask analysis data received:", dataAnalysis);
+              // console.log("Flask analysis data received:", dataAnalysis);
               setAnalysisResult(
                 dataAnalysis.analysis_result || "No specific analysis returned from backend."
               );
               setImportanceEnabled(dataAnalysis.preferences?.enable_importance || false);
               setGenerationEnabled(dataAnalysis.preferences?.enable_generation || false);
-              console.log(
-                "Analysis and preferences state updated. Importance:",
-                importanceEnabled,
-                "Confidential:",
-                generationEnabled
-              );
+              // console.log(
+              //   "Analysis and preferences state updated. Importance:",
+              //   importanceEnabled,
+              //   "Confidential:",
+              //   generationEnabled
+              // );
             } else {
               const errorText = await responseAnalysis.text();
               setAnalysisResult(`Error from backend (${responseAnalysis.status}): ${errorText}`);
@@ -173,7 +173,7 @@ const App = () => {
               emailSender
             );
             setSuggestedReplies(replies);
-            console.log("Suggested replies state updated. Count:", replies.length);
+            // console.log("Suggested replies state updated. Count:", replies.length);
           } else {
             setSuggestedReplies([]); // Clear replies if not authorized
           }
@@ -196,7 +196,7 @@ const App = () => {
   };
 
   const handleToggleChange = async (fieldName, isChecked) => {
-    console.log(`Toggle change detected: ${fieldName} to ${isChecked}`);
+    // console.log(`Toggle change detected: ${fieldName} to ${isChecked}`);
     if (fieldName === "enable_importance") {
       setImportanceEnabled(isChecked);
     } else if (fieldName === "enable_generation") {
@@ -216,7 +216,7 @@ const App = () => {
       payload.enable_generation = isChecked;
     }
 
-    console.log("Saving preferences to Flask:", payload);
+    // console.log("Saving preferences to Flask:", payload);
     try {
       const response = await fetch(`${FLASK_BASE_URL}/save_preferences`, {
         method: "POST",
@@ -228,7 +228,7 @@ const App = () => {
         if (fieldName === "enable_importance") setImportanceEnabled(!isChecked);
         if (fieldName === "enable_generation") setGenerationEnabled(!isChecked);
         const errorText = await response.text();
-        console.error("Failed to save preferences to Flask:", errorText);
+        // console.error("Failed to save preferences to Flask:", errorText);
         // Add a user-friendly notification if needed
       } else {
         console.log("Preferences successfully saved to Flask.");
@@ -244,13 +244,13 @@ const App = () => {
   const getSuggestedReplies = async (item, userEmail, subject, body, sender) => {
     const SUGGEST_REPLY_URL = `${FLASK_BASE_URL}/suggest_reply`;
     let fetchedReplies = [];
-    console.log("Initiating getSuggestedReplies...");
+    // console.log("Initiating getSuggestedReplies...");
 
     try {
       const emailBodyText = await new Promise((resolve) =>
         item.body.getAsync(Office.CoercionType.Text, (r) => resolve(r.value))
       );
-      console.log("Email body for reply suggestion:", emailBodyText.length, "characters");
+      // console.log("Email body for reply suggestion:", emailBodyText.length, "characters");
 
       const payload = {
         user_id: userEmail,
@@ -261,7 +261,7 @@ const App = () => {
         body: emailBodyText,
         sender: sender,
       };
-      console.log("Sending reply suggestion request to Flask:", payload);
+      // console.log("Sending reply suggestion request to Flask:", payload);
 
       const response = await fetch(SUGGEST_REPLY_URL, {
         method: "POST",
@@ -269,10 +269,10 @@ const App = () => {
         body: JSON.stringify(payload),
       });
 
-      console.log("Flask reply suggestion response status:", response.status);
+      // console.log("Flask reply suggestion response status:", response.status);
       if (response.ok) {
         const data = await response.json();
-        console.log("Flask reply suggestion data received:", data);
+        // console.log("Flask reply suggestion data received:", data);
         if (data.suggested_replies && Array.isArray(data.suggested_replies)) {
           fetchedReplies = data.suggested_replies;
         } else {
@@ -287,7 +287,7 @@ const App = () => {
     } catch (error) {
       console.error("Network error fetching suggested replies:", error);
     }
-    console.log("Finished getSuggestedReplies. Found:", fetchedReplies.length, "replies.");
+    // console.log("Finished getSuggestedReplies. Found:", fetchedReplies.length, "replies.");
     return fetchedReplies;
   };
 
@@ -297,7 +297,7 @@ const App = () => {
   };
 
   const handleReplyClick = (replyText) => {
-    console.log("Attempting to display reply form with text:", replyText.substring(0, 50) + "...");
+    // console.log("Attempting to display reply form with text:", replyText.substring(0, 50) + "...");
     Office.context.mailbox.item.displayReplyForm(replyText);
   };
 
