@@ -1,39 +1,43 @@
-# Office Add-in Taskpane React JS
+# Office アドイン タスクペイン React JS
 
-This project is an Outlook Add-in built with React. It provides a taskpane interface within Outlook.
+このプロジェクトは、React で構築された Outlook アドインです。Outlook 内でタスクペインのインターフェースを提供します。
 
-## Installation
+-----
 
-1.  **Clone the repository:**
+## インストール
+
+1.  **リポジトリをクローンする:**
     ```bash
     git clone https://github.com/parvezamm3/mailai_addin.git
     ```
-2.  **Navigate to the project directory:**
+2.  **プロジェクトディレクトリに移動する:**
     ```bash
-    cd outlook-addin-MailAIAddin
+    cd mailai_addin
     ```
-3.  **Install dependencies:**
+3.  **依存関係をインストールする:**
     ```bash
     npm install
     ```
 
-## Getting Started
+-----
 
-1.  **Start the development server and sideload the add-in:**
+## 開始方法
+
+1.  **開発サーバーを起動し、アドインをサイドロードする:**
+
     ```bash
     npm start
     ```
-    This command will start the development server and automatically open Outlook with the add-in sideloaded.
 
-2.  **Open the add-in in Outlook:**
-    *   In Outlook, open an email.
-    *   Click on the "MailAI" tab in the ribbon.
-    *   Click on "Show Taskpane" to open the add-in.
+    このコマンドを実行すると、開発サーバーが起動し、アドインがサイドロードされた状態で Outlook が自動的に開きます。
 
-## Available Scripts
+2.  **Outlook でアドインを開く:**
 
-*   `npm run lint`: Lints the code using ESLint.
-*   `npm run lint:fix`: Fixes linting errors automatically.
-*   `npm run validate`: Validates the `manifest.xml` file.
-*   `npm run build`: Builds the add-in for production.
+      * Outlook で、メールを開きます。
+      * 「アプリ」ボタンをクリックします。
+      * 「MailAI」を選択して、アドインを開きます。
 
+
+## 承認
+Flask バックエンドに、メールを自動的に読み込むための Graph API 権限を承認するには、この URL を使用してください。
+    ([https://equipped-externally-stud.ngrok-free.app/outlook-oauth2callback](https://equipped-externally-stud.ngrok-free.app/outlook-oauth2callback))
