@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0" xsi:type="MailApp">
+
+  <Id>971E76EF-D73E-567F-ADAE-5A76B39052C8</Id>
+  <Version>1.0.0.1</Version>
+  <ProviderName>Gemini</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="MailAI Addin"/>
+  <Description DefaultValue="A React-based Outlook Add-in."/>
+  
+  <IconUrl DefaultValue="https://localhost:3000/assets/icon-64.png"/>
+  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-128.png"/>
+  <SupportUrl DefaultValue="https://equipped-externally-stud.ngrok-free.app/help"/>
+
+  <AppDomains>
+    <AppDomain>https://localhost:3000</AppDomain>
+    <AppDomain>https://equipped-externally-stud.ngrok-free.app</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Mailbox"/>
+  </Hosts>
+
+  <Requirements>
+    <Sets>
+      <Set Name="Mailbox" MinVersion="1.1"/>
+    </Sets>
+  </Requirements>
+
+  <FormSettings>
+    <Form xsi:type="ItemRead">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="https://localhost:3000/taskpane.html"/>
+        <RequestedHeight>250</RequestedHeight>
+      </DesktopSettings>
+    </Form>
+  </FormSettings>
+
+  <Permissions>ReadWriteItem</Permissions>
+  
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read"/>
+  </Rule>
+  
+  <DisableEntityHighlighting>false</DisableEntityHighlighting>
+  
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
+      
+      <Requirements>
+        <bt:Sets DefaultMinVersion="1.13">
+          <bt:Set Name="Mailbox"/>
+        </bt:Sets>
+      </Requirements>
+      
+      <Hosts>
+        <Host xsi:type="MailHost">
+          <DesktopFormFactor>
+          <SupportsSharedFolders>true</SupportsSharedFolders>
+            <FunctionFile resid="functionFile"/>
+            <ExtensionPoint xsi:type="MessageReadCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="msgReadGroup">
+                  <Label resid="groupLabel"/>
+                  <Control xsi:type="Button" id="msgReadOpenPaneButton">
+                    <Label resid="taskPaneButtonLabel"/>
+                    <Supertip>
+                      <Title resid="taskPaneButtonLabel"/>
+                      <Description resid="taskPaneButtonDescription"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="icon16"/>
+                      <bt:Image size="32" resid="icon32"/>
+                      <bt:Image size="80" resid="icon80"/>
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="messageReadTaskPaneUrl"/>
+                      <SupportsPinning>true</SupportsPinning>
+                    </Action>
+                  </Control>
+                  <!-- <Control xsi:type="Button" id="msgReadActionButton">
+                    <Label resid="actionButtonLabel"/>
+                    <Supertip>
+                      <Title resid="actionButtonLabel"/>
+                      <Description resid="actionButtonDescription"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="icon16"/>
+                      <bt:Image size="32" resid="icon32"/>
+                      <bt:Image size="80" resid="icon80"/>
+                    </Icon>
+                    <Action xsi:type="ExecuteFunction">
+                      <FunctionName>run</FunctionName>
+                    </Action>
+                  </Control> -->
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
+          </DesktopFormFactor>
+        </Host>
+      </Hosts>
+      
+      <Resources>
+        <bt:Images>
+          <bt:Image id="icon16" DefaultValue="https://localhost:3000/assets/icon-16.png"/>
+          <bt:Image id="icon32" DefaultValue="https://localhost:3000/assets/icon-32.png"/>
+          <bt:Image id="icon80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
+        </bt:Images>
+        <bt:Urls>
+          <bt:Url id="functionFile" DefaultValue="https://localhost:3000/commands.html"/>
+          <bt:Url id="messageReadTaskPaneUrl" DefaultValue="https://localhost:3000/taskpane.html"/>
+        </bt:Urls>
+        <bt:ShortStrings>
+          <bt:String id="groupLabel" DefaultValue="My AI Assistant"/>
+          <bt:String id="taskPaneButtonLabel" DefaultValue="Show AI Assistant"/>
+          <!-- <bt:String id="actionButtonLabel" DefaultValue="Perform an Action"/> -->
+        </bt:ShortStrings>
+        <bt:LongStrings>
+          <bt:String id="taskPaneButtonDescription" DefaultValue="Opens an AI assistant task pane."/>
+          <!-- <bt:String id="actionButtonDescription" DefaultValue="Performs an action."/> -->
+        </bt:LongStrings>
+      </Resources>
+      
+    </VersionOverrides>
+  </VersionOverrides>
+</OfficeApp>
