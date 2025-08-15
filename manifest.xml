@@ -3,7 +3,7 @@
 
   <Id>971E76EF-D73E-567F-ADAE-5A76B39052C8</Id>
   <Version>1.0.0.1</Version>
-  <ProviderName>Gemini</ProviderName>
+  <ProviderName>Yokoyama Systems</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="MailAI Addin"/>
   <Description DefaultValue="A React-based Outlook Add-in."/>
