@@ -2,7 +2,7 @@
 <OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0" xsi:type="MailApp">
 
   <Id>971E76EF-D73E-567F-ADAE-5A76B39052C8</Id>
-  <Version>1.0.0.1</Version>
+  <Version>1.0.0.2</Version>
   <ProviderName>Yokoyama Systems</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="MailAI Addin"/>
@@ -23,7 +23,7 @@
 
   <Requirements>
     <Sets>
-      <Set Name="Mailbox" MinVersion="1.1"/>
+      <Set Name="Mailbox" MinVersion="1.13"/>
     </Sets>
   </Requirements>
 
@@ -48,13 +48,21 @@
     <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
       
       <Requirements>
-        <bt:Sets DefaultMinVersion="1.13">
+        <bt:Sets DefaultMinVersion="1.15">
           <bt:Set Name="Mailbox"/>
         </bt:Sets>
       </Requirements>
       
       <Hosts>
         <Host xsi:type="MailHost">
+         <Runtimes>
+          <!-- HTML file including reference to or inline JavaScript event handlers.
+               This is used by Outlook on the web and on the new Mac UI, and new Outlook on Windows. -->
+          <Runtime resid="WebViewRuntime.Url">
+            <!-- JavaScript file containing event handlers. This is used by classic Outlook on Windows. -->
+            <Override type="javascript" resid="JSRuntime.Url"/>
+          </Runtime>
+        </Runtimes>
           <DesktopFormFactor>
           <SupportsSharedFolders>true</SupportsSharedFolders>
             <FunctionFile resid="functionFile"/>
@@ -78,27 +86,47 @@
                       <SupportsPinning>true</SupportsPinning>
                     </Action>
                   </Control>
-                  <!-- <Control xsi:type="Button" id="msgReadActionButton">
-                    <Label resid="actionButtonLabel"/>
-                    <Supertip>
-                      <Title resid="actionButtonLabel"/>
-                      <Description resid="actionButtonDescription"/>
-                    </Supertip>
-                    <Icon>
-                      <bt:Image size="16" resid="icon16"/>
-                      <bt:Image size="32" resid="icon32"/>
-                      <bt:Image size="80" resid="icon80"/>
-                    </Icon>
-                    <Action xsi:type="ExecuteFunction">
-                      <FunctionName>run</FunctionName>
-                    </Action>
-                  </Control> -->
                 </Group>
               </OfficeTab>
+            </ExtensionPoint>
+            <ExtensionPoint xsi:type="MessageComposeCommandSurface">
+                <OfficeTab id="TabDefault">
+                    <Group id="composeGroup">
+                        <Label resid="groupLabel"/>
+                        <Control xsi:type="Button" id="composeOpenPaneButton">
+                            <Label resid="taskPaneButtonLabel"/>
+                            <Supertip>
+                                <Title resid="taskPaneButtonLabel"/>
+                                <Description resid="taskPaneButtonDescription"/>
+                            </Supertip>
+                            <Icon>
+                                <bt:Image size="16" resid="icon16"/>
+                                <bt:Image size="32" resid="icon32"/>
+                                <bt:Image size="80" resid="icon80"/>
+                            </Icon>
+                            <Action xsi:type="ShowTaskpane">
+                                <SourceLocation resid="messageReadTaskPaneUrl"/>
+                                <SupportsPinning>true</SupportsPinning>
+                            </Action>
+                        </Control>
+                    </Group>
+                </OfficeTab>
+            </ExtensionPoint>
+            <ExtensionPoint xsi:type="LaunchEvent">
+                <LaunchEvents>
+                    <LaunchEvent Type="OnMessageSend" FunctionName="onMessageSend" SendMode="SoftBlock"/>
+                </LaunchEvents>
+                <SourceLocation resid="WebViewRuntime.Url"/>
             </ExtensionPoint>
           </DesktopFormFactor>
         </Host>
       </Hosts>
+
+       <!-- <Runtimes>
+      <Runtime resid="WebViewRuntime.Url">
+        <Override type="javascript" resid="JSRuntime.Url"/>
+      </Runtime>
+    </Runtimes> -->
       
       <Resources>
         <bt:Images>
@@ -109,18 +137,21 @@
         <bt:Urls>
           <bt:Url id="functionFile" DefaultValue="https://localhost:3000/commands.html"/>
           <bt:Url id="messageReadTaskPaneUrl" DefaultValue="https://localhost:3000/taskpane.html"/>
+
+          <!-- Add URLs for the launch event runtime -->
+        <bt:Url id="WebViewRuntime.Url" DefaultValue="https://localhost:3000/commands.html"/>
+        <bt:Url id="JSRuntime.Url" DefaultValue="https://localhost:3000/launchevent.js"/>
         </bt:Urls>
         <bt:ShortStrings>
           <bt:String id="groupLabel" DefaultValue="My AI Assistant"/>
           <bt:String id="taskPaneButtonLabel" DefaultValue="Show AI Assistant"/>
-          <!-- <bt:String id="actionButtonLabel" DefaultValue="Perform an Action"/> -->
         </bt:ShortStrings>
         <bt:LongStrings>
           <bt:String id="taskPaneButtonDescription" DefaultValue="Opens an AI assistant task pane."/>
-          <!-- <bt:String id="actionButtonDescription" DefaultValue="Performs an action."/> -->
         </bt:LongStrings>
       </Resources>
       
     </VersionOverrides>
   </VersionOverrides>
 </OfficeApp>
+

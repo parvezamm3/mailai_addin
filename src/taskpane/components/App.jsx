@@ -2,6 +2,10 @@ import React, { useState, useEffect } from "react";
 import { Panel, Pivot, PivotItem, Spinner, SpinnerSize, Stack, Text } from "@fluentui/react";
 import ToggleSwitch from "./ToggleSwitch";
 import SuggestedReplies from "./SuggestedReplies";
+import { initializeIcons } from "@fluentui/react/lib/Icons";
+
+// Initialize Fluent UI icons at the top of your app
+initializeIcons();
 
 const FLASK_BASE_URL = "https://equipped-externally-stud.ngrok-free.app";
 
@@ -11,10 +15,14 @@ const App = () => {
   const [importanceEnabled, setImportanceEnabled] = useState(false);
   const [generationEnabled, setGenerationEnabled] = useState(false);
   const [suggestedReplies, setSuggestedReplies] = useState([]);
-  const [emailDetails, setEmailDetails] = useState(null); // Keep emailDetails state
+  const [emailDetails, setEmailDetails] = useState(null); 
   const [isAuthorized, setIsAuthorized] = useState(true);
 
+  const [outgoingValidation, setOutgoingValidation] = useState(null); // NEW state for outgoing validation
+
   useEffect(() => {
+    // Expose the function globally so the commands.js handler can call it
+
     console.log("App component mounted. Calling Office.onReady...");
     Office.onReady((info) => {
       // Log all properties of the info object for detailed debugging
@@ -298,8 +306,17 @@ const App = () => {
 
   const handleReplyClick = (replyText) => {
     // console.log("Attempting to display reply form with text:", replyText.substring(0, 50) + "...");
-    Office.context.mailbox.item.displayReplyForm(replyText);
+    const replyHtml = replyText.replace(/\n/g, '<br />');
+    const replyOptions = {
+        htmlBody: replyHtml
+    };
+    Office.context.mailbox.item.displayReplyForm(replyOptions);
+    // Office.context.mailbox.item.displayReplyForm(replyText);
   };
+
+
+  // ----------------- NEW: Outgoing Email Validation Logic -----------------
+  
 
   if (isLoading) {
     return (

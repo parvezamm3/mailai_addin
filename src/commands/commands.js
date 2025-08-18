@@ -31,5 +31,6 @@ function action(event) {
   event.completed();
 }
 
+
 // Register the function with Office.
 Office.actions.associate("action", action);
