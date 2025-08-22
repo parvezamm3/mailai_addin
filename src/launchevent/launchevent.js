@@ -51,7 +51,7 @@ async function handleOutgoingEmail(event) {
     const sender = senderResult.value.emailAddress;
     const conversationId = item.conversationId;
     const attachments = attachmentsResult.value;
-    console.log(body);
+    // console.log(body);
     // console.log(attachments);
     // console.log(Office.context.mailbox.userProfile.emailAddress);
     const outgoingPayload = {
