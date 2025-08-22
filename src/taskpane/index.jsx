@@ -8,7 +8,7 @@ import App from './components/App';
 
 // Initialize Fluent UI icons (important for all Fluent UI components)
 initializeIcons();
-console.log("Initializing");
+// console.log("Initializing");
 /* global document, Office */
 
 // Define the root DOM element where the React app will be mounted
@@ -29,7 +29,7 @@ const render = (Component) => {
 // Check if Office.js is ready before rendering the app
 Office.onReady(() => {
   // We no longer need the isOfficeInitialized state, as render() will be called only once Office.js is ready.
-  console.log("Office is Ready");
+  // console.log("Office is Ready");
   render(App);
 });
 

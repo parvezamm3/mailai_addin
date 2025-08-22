@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { Panel, Pivot, PivotItem, Spinner, SpinnerSize, Stack, Text } from "@fluentui/react";
+import {
+  Panel,
+  Pivot,
+  PivotItem,
+  Spinner,
+  SpinnerSize,
+  Stack,
+  Text,
+  MessageBar,
+  MessageBarType,
+} from "@fluentui/react";
 import ToggleSwitch from "./ToggleSwitch";
 import SuggestedReplies from "./SuggestedReplies";
 import { initializeIcons } from "@fluentui/react/lib/Icons";
@@ -14,23 +24,28 @@ const App = () => {
   const [analysisResult, setAnalysisResult] = useState("Loading analysis and preferences...");
   const [importanceEnabled, setImportanceEnabled] = useState(false);
   const [generationEnabled, setGenerationEnabled] = useState(false);
+  const [is_spam, set_is_spam] = useState(false);
+  const [is_malicious, set_is_malicious] = useState(false);
   const [suggestedReplies, setSuggestedReplies] = useState([]);
-  const [emailDetails, setEmailDetails] = useState(null); 
+  const [category, setCategory] = useState("");
+  const [summary, setSummary] = useState("");
+  // const [emailDetails, setEmailDetails] = useState(null);
+  const [errorMessage, setErrorMessage] = useState("");
   const [isAuthorized, setIsAuthorized] = useState(true);
 
-  const [outgoingValidation, setOutgoingValidation] = useState(null); // NEW state for outgoing validation
+  // const [outgoingValidation, setOutgoingValidation] = useState(null); // NEW state for outgoing validation
 
   useEffect(() => {
     // Expose the function globally so the commands.js handler can call it
 
-    console.log("App component mounted. Calling Office.onReady...");
+    // console.log("App component mounted. Calling Office.onReady...");
     Office.onReady((info) => {
       // Log all properties of the info object for detailed debugging
       // console.log("Office.onReady fired. info object:", info);
 
       // Changed condition: Only check for host type. If onReady fires, it's generally initialized enough.
       if (info.host === Office.HostType.Outlook) {
-        console.log("Office host is Outlook. Loading email details...");
+        // console.log("Office host is Outlook. Loading email details...");
         loadEmailDetails();
         try {
           Office.context.mailbox.addHandlerAsync(
@@ -38,7 +53,7 @@ const App = () => {
             loadEmailDetails,
             (asyncResult) => {
               if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
-                console.log("Successfully added ItemChanged event handler.");
+                // console.log("Successfully added ItemChanged event handler.");
               } else {
                 console.error(
                   `Failed to add ItemChanged event handler: ${asyncResult.error.message}`
@@ -81,7 +96,7 @@ const App = () => {
   }, []);
 
   const loadEmailDetails = async () => {
-    console.log("loadEmailDetails function started.");
+    // console.log("loadEmailDetails function started.");
     setIsLoading(true); // Ensure loading state is active
     setIsAuthorized(true); // Assume authorized until proven otherwise
     try {
@@ -90,43 +105,52 @@ const App = () => {
 
       if (!item) {
         console.log("No mail item found. Setting analysis result and ending loading.");
-        setAnalysisResult("Please open an email to use this add-on's functionality.");
+        setErrorMessage("このアドオンの機能を使用するには、メールを開いてください。");
         setIsLoading(false);
-        setIsAuthorized(false);
+        // setIsAuthorized(false);
         return;
       }
-
+      // for
+      // console.log(item.to);
       const emailSubject = item.subject;
       const emailSender = item.sender.emailAddress;
       const messageId = item.itemId;
       const convId = item.conversationId;
       const userEmail = Office.context.mailbox.userProfile.emailAddress;
-
-      // console.log("Email Subject:", emailSubject);
-      // console.log("Email Sender:", emailSender);
-      // console.log("Message ID:", messageId);
-      // console.log("User Email:", userEmail);
-
-      // Get the plain text body asynchronously
+      let ownerEmail = userEmail;
+      try {
+        Office.context.mailbox.item.getSharedPropertiesAsync((asyncResult) => {
+          if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+            // The method succeeded, so the item is in a shared mailbox or shared folder.
+            const sharedProperties = asyncResult.value;
+            ownerEmail = sharedProperties.owner;
+          }
+        });
+      } catch (error) {
+        // console.log(error);
+      }
       item.body.getAsync(Office.CoercionType.Text, async (asyncResult) => {
         // console.log("item.body.getAsync result status:", asyncResult.status);
         if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
           const emailBody = asyncResult.value;
           // console.log("Email Body successfully retrieved. Length:", emailBody.length);
 
-          setEmailDetails({
-            subject: emailSubject,
-            body: emailBody,
-            sender: emailSender,
-            convId: convId,
-            messageId: messageId,
-            userEmail: userEmail,
-          });
+          // setEmailDetails({
+          //   subject: emailSubject,
+          //   body: emailBody,
+          //   sender: emailSender,
+          //   reciver:receiver,
+          //   convId: convId,
+          //   messageId: messageId,
+          //   userEmail: userEmail,
+          // });
 
           // --- Fetch analysis and preferences from Flask backend ---
           const payloadAnalysis = {
             user_id: userEmail,
+            ownerEmail: ownerEmail,
             platform: "outlook",
+            sender:emailSender,
             subject: emailSubject,
             body: emailBody,
             conv_id: convId,
@@ -139,69 +163,139 @@ const App = () => {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payloadAnalysis),
             });
+            console.log(responseAnalysis);
 
             // console.log("Flask analysis response status:", responseAnalysis.status);
             if (responseAnalysis.status === 401) {
-              console.warn("User not authorized. Displaying authorization prompt.");
+              const errorText = await responseAnalysis.text();
+              console.warn(`User not authorized. Displaying authorization prompt.: ${errorText}`);
               setIsAuthorized(false); // Set authorization to false
-              setAnalysisResult("Authorization required to access AI features.");
+              setErrorMessage("AI 機能にアクセスするには承認が必要です。");
             } else if (responseAnalysis.ok) {
               const dataAnalysis = await responseAnalysis.json();
               // console.log("Flask analysis data received:", dataAnalysis);
-              setAnalysisResult(
-                dataAnalysis.analysis_result || "No specific analysis returned from backend."
-              );
+              setErrorMessage('');
+              set_is_spam(dataAnalysis.is_spam);
+              set_is_malicious(dataAnalysis.is_malicious);
+              setAnalysisResult(dataAnalysis.analysis_result || "結果が返されませんでした");
+              setSuggestedReplies(dataAnalysis.replies);
+              setCategory(dataAnalysis.category);
+              setSummary(dataAnalysis.summary);
               setImportanceEnabled(dataAnalysis.preferences?.enable_importance || false);
               setGenerationEnabled(dataAnalysis.preferences?.enable_generation || false);
-              // console.log(
-              //   "Analysis and preferences state updated. Importance:",
-              //   importanceEnabled,
-              //   "Confidential:",
-              //   generationEnabled
-              // );
             } else {
-              const errorText = await responseAnalysis.text();
-              setAnalysisResult(`Error from backend (${responseAnalysis.status}): ${errorText}`);
-              console.error("Error fetching dashboard data from Flask:", errorText);
+              const errorText = responseAnalysis.message;
+              setErrorMessage(
+                errorText
+              );
+              console.log("Error fetching dashboard data from Flask:", errorText);
             }
           } catch (error) {
-            setAnalysisResult(`Failed to connect to backend for analysis: ${error.message}`);
+            setErrorMessage(`分析のためにバックエンドに接続できませんでした: ${error.message}`);
             console.error("Network error during analysis fetch:", error);
-          }
-
-          // Only fetch replies if authorized
-          if (isAuthorized) {
-            // Check isAuthorized *after* the dashboard_data fetch
-            console.log("Fetching suggested replies...");
-            const replies = await getSuggestedReplies(
-              item,
-              userEmail,
-              emailSubject,
-              emailBody,
-              emailSender
-            );
-            setSuggestedReplies(replies);
-            // console.log("Suggested replies state updated. Count:", replies.length);
-          } else {
-            setSuggestedReplies([]); // Clear replies if not authorized
           }
 
           setIsLoading(false);
           console.log("isLoading set to false. UI should now fully render.");
         } else {
           // Handle error if email body cannot be retrieved
-          setAnalysisResult(`Error retrieving email body: ${asyncResult.error.message}`);
+          setErrorMessage(`メール本文の取得中にエラーが発生しました: ${asyncResult.error.message}`);
           console.error("Error in item.body.getAsync:", asyncResult.error);
           setIsLoading(false);
         }
       });
     } catch (error) {
       console.error("General error in loadEmailDetails:", error);
-      setAnalysisResult(`An unexpected error occurred: ${error.message}`);
+      setAnalysisResult(`予期しないエラーが発生しました: ${error.message}`);
       setIsLoading(false);
       setIsAuthorized(false);
     }
   };
+
+  // const generateAnalysis = async () => {
+  //   try {
+  //     const item = Office.context.mailbox.item;
+  //     const messageId = item.itemId;
+  //     const convId = item.conversationId;
+  //     const userEmail = Office.context.mailbox.userProfile.emailAddress;
+  //     let ownerEmail = userEmail;
+  //     try {
+  //       Office.context.mailbox.item.getSharedPropertiesAsync((asyncResult) => {
+  //       if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+  //         // The method succeeded, so the item is in a shared mailbox or shared folder.
+  //         const sharedProperties = asyncResult.value;
+  //         ownerEmail = sharedProperties.owner;
+  //       }
+  //     });
+  //     } catch (error) {
+  //       console.log(error);
+  //     }
+  //     item.body.getAsync(Office.CoercionType.Text, async (asyncResult) => {
+  //       // console.log("item.body.getAsync result status:", asyncResult.status);
+  //       if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+  //         const emailBody = asyncResult.value;
+
+  //         // --- Fetch analysis and preferences from Flask backend ---
+  //         const payloadAnalysis = {
+  //           ownerEmail:ownerEmail,
+  //           message_id: messageId,
+  //         };
+  //         // console.log("Sending analysis request to Flask:", payloadAnalysis);
+  //         try {
+  //           const responseAnalysis = await fetch(`${FLASK_BASE_URL}/generate_analysis_outlook`, {
+  //             method: "POST",
+  //             headers: { "Content-Type": "application/json" },
+  //             body: JSON.stringify(payloadAnalysis),
+  //           });
+
+  //           if (responseAnalysis.ok) {
+  //             const dataAnalysis = await responseAnalysis.json();
+  //             // console.log("Flask analysis data received:", dataAnalysis);
+  //             set_is_spam(dataAnalysis.is_spam);
+  //             set_is_malicious(dataAnalysis.is_malicious);
+  //             setAnalysisResult(
+  //               dataAnalysis.analysis_result || "結果が返されませんでした"
+  //             );
+  //           } else {
+  //             const errorText = await responseAnalysis.text();
+  //             setAnalysisResult(`Error from backend (${responseAnalysis.status}): ${errorText}`);
+  //             console.error("Error fetching dashboard data from Flask:", errorText);
+  //           }
+  //         } catch (error) {
+  //           setAnalysisResult(`Failed to connect to backend for analysis: ${error.message}`);
+  //           console.error("Network error during analysis fetch:", error);
+  //         }
+
+  //         // Only fetch replies if authorized
+  //         if (isAuthorized) {
+  //           // Check isAuthorized *after* the dashboard_data fetch
+  //           // console.log("Fetching suggested replies...");
+  //           const replies = await getSuggestedReplies(
+  //             item,
+  //             ownerEmail
+  //           );
+  //           setSuggestedReplies(replies);
+  //           // console.log("Suggested replies state updated. Count:", replies.length);
+  //         } else {
+  //           setSuggestedReplies([]); // Clear replies if not authorized
+  //         }
+
+  //         setIsLoading(false);
+  //         console.log("isLoading set to false. UI should now fully render.");
+  //       } else {
+  //         // Handle error if email body cannot be retrieved
+  //         setAnalysisResult(`Error retrieving email body: ${asyncResult.error.message}`);
+  //         console.error("Error in item.body.getAsync:", asyncResult.error);
+  //         setIsLoading(false);
+  //       }
+  //     });
+  //   } catch (error) {
+  //     console.error("General error in loadEmailDetails:", error);
+  //     setAnalysisResult(`An unexpected error occurred: ${error.message}`);
+  //     setIsLoading(false);
+  //     setIsAuthorized(false);
+  //   }
+  // }
 
   const handleToggleChange = async (fieldName, isChecked) => {
     // console.log(`Toggle change detected: ${fieldName} to ${isChecked}`);
@@ -249,25 +343,17 @@ const App = () => {
     }
   };
 
-  const getSuggestedReplies = async (item, userEmail, subject, body, sender) => {
+  const getSuggestedReplies = async (item, userEmail) => {
     const SUGGEST_REPLY_URL = `${FLASK_BASE_URL}/suggest_reply`;
     let fetchedReplies = [];
     // console.log("Initiating getSuggestedReplies...");
 
     try {
-      const emailBodyText = await new Promise((resolve) =>
-        item.body.getAsync(Office.CoercionType.Text, (r) => resolve(r.value))
-      );
-      // console.log("Email body for reply suggestion:", emailBodyText.length, "characters");
 
       const payload = {
         user_id: userEmail,
-        platform: "outlook",
         conv_id: item.conversationId,
         message_id: item.itemId,
-        subject: subject,
-        body: emailBodyText,
-        sender: sender,
       };
       // console.log("Sending reply suggestion request to Flask:", payload);
 
@@ -283,6 +369,7 @@ const App = () => {
         // console.log("Flask reply suggestion data received:", data);
         if (data.suggested_replies && Array.isArray(data.suggested_replies)) {
           fetchedReplies = data.suggested_replies;
+          setCategory(data.category);
         } else {
           console.warn("Backend did not return an array of suggested replies in expected format.");
         }
@@ -306,17 +393,13 @@ const App = () => {
 
   const handleReplyClick = (replyText) => {
     // console.log("Attempting to display reply form with text:", replyText.substring(0, 50) + "...");
-    const replyHtml = replyText.replace(/\n/g, '<br />');
+    const replyHtml = replyText.replace(/\n/g, "<br />");
     const replyOptions = {
-        htmlBody: replyHtml
+      htmlBody: replyHtml,
     };
     Office.context.mailbox.item.displayReplyForm(replyOptions);
     // Office.context.mailbox.item.displayReplyForm(replyText);
   };
-
-
-  // ----------------- NEW: Outgoing Email Validation Logic -----------------
-  
 
   if (isLoading) {
     return (
@@ -350,13 +433,21 @@ const App = () => {
         onClick={handleRefresh}
         className="w-full bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-50 mb-4"
       >
-        Refresh Content
+        コンテンツをリフレッシュ
       </button>
+      {errorMessage && (
+            <>
+              <Stack>
+                <MessageBar messageBarType={MessageBarType.error}>{errorMessage}</MessageBar>
+              </Stack>
+            </>
+          )}
 
       {/* Conditional Rendering based on Authorization */}
       {isAuthorized ? (
         <>
           {/* Feature Control Section */}
+
           <Stack
             tokens={{ childrenGap: 10, padding: 15 }}
             styles={{ root: { border: "1px solid #ccc", borderRadius: 8 } }}
@@ -380,21 +471,34 @@ const App = () => {
           <Text variant="large" styles={{ root: { fontWeight: "bold" } }}>
             分析
           </Text>
-          {importanceEnabled && (
+          {!is_spam && !is_malicious ? (
             <>
-              <Stack
-                tokens={{ childrenGap: 10, padding: 15 }}
-                styles={{ root: { border: "1px solid #ccccccff", borderRadius: 8 } }}
-              >
-                <FormattedText text={analysisResult} />
-                {/* <Text variant="medium">{analysisResult}</Text> */}
-              </Stack>
+              {importanceEnabled && (
+                <Stack
+                  tokens={{ childrenGap: 10, padding: 15 }}
+                  styles={{ root: { border: "1px solid #ccccccff", borderRadius: 8 } }}
+                >
+                  <FormattedText text={analysisResult} />
+                </Stack>
+              )}
+
+              {generationEnabled && (
+                <>
+                  <p>
+                    <b>カテゴリー</b> : {category}
+                  </p>
+                  <p>
+                    <b>要約 : </b>
+                    {summary}{" "}
+                  </p>
+                  <SuggestedReplies replies={suggestedReplies} onReplyClick={handleReplyClick} />
+                </>
+              )}
             </>
-          )}
-          {generationEnabled && (
-            <>
-              <SuggestedReplies replies={suggestedReplies} onReplyClick={handleReplyClick} />
-            </>
+          ) : (
+            <MessageBar messageBarType={MessageBarType.error}>
+              このメールはスパムまたは悪意のあるコンテンツとして検出されました。
+            </MessageBar>
           )}
         </>
       ) : (

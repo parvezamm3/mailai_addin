@@ -10,8 +10,8 @@ import { Toggle, Stack } from '@fluentui/react';
  * @param {(checked: boolean) => void} props.onToggle - Callback function when the toggle state changes.
  */
 const ToggleSwitch = ({ label, checked, onToggle }) => {
-    console.log("Toggling Switch");
-    console.log(label, checked, onToggle);
+    // console.log("Toggling Switch");
+    // console.log(label, checked, onToggle);
   return (
     <Stack horizontal tokens={{ childrenGap: 10 }} verticalAlign="center">
       <Toggle

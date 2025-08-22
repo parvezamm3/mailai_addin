@@ -23,7 +23,7 @@
 
   <Requirements>
     <Sets>
-      <Set Name="Mailbox" MinVersion="1.13"/>
+      <Set Name="Mailbox" MinVersion="1.15"/>
     </Sets>
   </Requirements>
 
@@ -40,6 +40,7 @@
   
   <Rule xsi:type="RuleCollection" Mode="Or">
     <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read"/>
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Edit"/>
   </Rule>
   
   <DisableEntityHighlighting>false</DisableEntityHighlighting>
@@ -105,8 +106,24 @@
                                 <bt:Image size="80" resid="icon80"/>
                             </Icon>
                             <Action xsi:type="ShowTaskpane">
-                                <SourceLocation resid="messageReadTaskPaneUrl"/>
+                                <!-- <SourceLocation resid="messageReadTaskPaneUrl"/> -->
+                                <SourceLocation resid="messageComposeTaskPaneUrl"/>
                                 <SupportsPinning>true</SupportsPinning>
+                            </Action>
+                        </Control>
+                        <Control xsi:type="Button" id="composeSendAnywayButton">
+                            <Label resid="sendAnywayLabel"/>
+                            <Supertip>
+                                <Title resid="sendAnywayLabel"/>
+                                <Description resid="sendAnywaySupertip"/>
+                            </Supertip>
+                            <Icon>
+                                <bt:Image size="16" resid="sendAnywayIcon16"/>
+                                <bt:Image size="32" resid="sendAnywayIcon32"/>
+                                <bt:Image size="80" resid="sendAnywayIcon80"/>
+                            </Icon>
+                            <Action xsi:type="ExecuteFunction">
+                                <FunctionName>sendAnywayFunction</FunctionName>
                             </Action>
                         </Control>
                     </Group>
@@ -133,10 +150,14 @@
           <bt:Image id="icon16" DefaultValue="https://localhost:3000/assets/icon-16.png"/>
           <bt:Image id="icon32" DefaultValue="https://localhost:3000/assets/icon-32.png"/>
           <bt:Image id="icon80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
+          <bt:Image id="sendAnywayIcon16" DefaultValue="https://localhost:3000/assets/icon-16.png"/>
+          <bt:Image id="sendAnywayIcon32" DefaultValue="https://localhost:3000/assets/icon-32.png"/>
+          <bt:Image id="sendAnywayIcon80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
         </bt:Images>
         <bt:Urls>
           <bt:Url id="functionFile" DefaultValue="https://localhost:3000/commands.html"/>
           <bt:Url id="messageReadTaskPaneUrl" DefaultValue="https://localhost:3000/taskpane.html"/>
+          <bt:Url id="messageComposeTaskPaneUrl" DefaultValue="https://localhost:3000/compose_taskpane.html"/>
 
           <!-- Add URLs for the launch event runtime -->
         <bt:Url id="WebViewRuntime.Url" DefaultValue="https://localhost:3000/commands.html"/>
@@ -145,9 +166,12 @@
         <bt:ShortStrings>
           <bt:String id="groupLabel" DefaultValue="My AI Assistant"/>
           <bt:String id="taskPaneButtonLabel" DefaultValue="Show AI Assistant"/>
+          <bt:String id="sendAnywayLabel" DefaultValue="Send Anyway"/>
         </bt:ShortStrings>
         <bt:LongStrings>
           <bt:String id="taskPaneButtonDescription" DefaultValue="Opens an AI assistant task pane."/>
+          <bt:String id="sendAnywaySupertip" DefaultValue="Override the validation and send the email."/>
+
         </bt:LongStrings>
       </Resources>
       

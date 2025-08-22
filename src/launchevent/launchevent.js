@@ -1,232 +1,126 @@
 const FLASK_BASE_URL = "https://equipped-externally-stud.ngrok-free.app";
 function onMessageSend(event) {
-  // Prevent the email from being sent immediately
-//   event.completed({ allowEvent: false }); 
-  console.log('onMessageSend activated')
-  // You can now call a function from your App.jsx to handle the validation
-  // For simplicity, we'll assume a global function is exposed, but a better
-  // pattern is to use a shared service or event bus.
-  handleOutgoingEmail(event);
-// Office.context.mailbox.item.body.getAsync(
-//     "text",
-//     { asyncContext: event },
-//     getBodyCallback
-//   );
-
-}
-
-function getBodyCallback(asyncResult){
-  const event = asyncResult.asyncContext;
-  console.log(event);
-  let body = "";
-  if (asyncResult.status !== Office.AsyncResultStatus.Failed && asyncResult.value !== undefined) {
-    body = asyncResult.value;
-    console.log("body");
-    console.log(body);
-  } else {
-    const message = "Failed to get body text";
-    console.error(message);
-    console.log(asyncResult);
-    event.completed({ allowEvent: false, errorMessage: message });
+  // sessionStorage.setItem('validationResult', JSON.stringify({ status: "loading", message: "Checking your email for potential issues..." }));
+  if (sessionStorage.getItem("sendAnyway") === "true") {
+    sessionStorage.removeItem("sendAnyway"); // Clean up the flag
+    event.completed({ allowEvent: true }); // Allow the send to proceed
     return;
   }
-
-  const matches = hasMatches(body);
-  if (matches) {
-    Office.context.mailbox.item.getAttachmentsAsync(
-      { asyncContext: event },
-      getAttachmentsCallback);
-  } else {
-    event.completed({ allowEvent: true });
-  }
+  handleOutgoingEmail(event);
 }
 
-function hasMatches(body) {
-  if (body == null || body == "") {
-    return false;
-  }
-  console.log("Has Matches");
+async function handleOutgoingEmail(event) {
+  // Display a loading message in the Outlook UI
+//   console.log("validating mail");
+  // console.log(event);
+  Office.context.mailbox.item.notificationMessages.addAsync("progress", {
+    type: "informationalMessage",
+    message: "潜在的な問題がないかメールを確認しています...",
+    icon: "Icon.16x16",
+    persistent: false,
+  });
+  // const TASK_PANE_URL = "https://localhost:3000/compose_taskpane.html";
 
-  const arrayOfTerms = ["send", "picture", "document", "attachment"];
-  for (let index = 0; index < arrayOfTerms.length; index++) {
-    const term = arrayOfTerms[index].trim();
-    const regex = RegExp(term, 'i');
-    if (regex.test(body)) {
-      return true;
-    }
-  }
-  console.log("HasMatches finished");
+  try {
+    const item = Office.context.mailbox.item;
+      // console.log(item);
+    const [
+      subjectResult,
+      bodyResult,
+      recipientsResult,
+      ccResult,
+      bccResult,
+      senderResult,
+      attachmentsResult,
+    ] = await Promise.all([
+      new Promise((resolve) => item.subject.getAsync((result) => resolve(result))),
+      new Promise((resolve) =>
+        item.body.getAsync(Office.CoercionType.Text, { bodyMode: Office.MailboxEnums.BodyMode.HostConfig }  , (result) => resolve(result))
+      ),
+      new Promise((resolve) => item.to.getAsync((result) => resolve(result))),
+      new Promise((resolve) => item.cc.getAsync((result) => resolve(result))),
+      new Promise((resolve) => item.bcc.getAsync((result) => resolve(result))),
+      new Promise((resolve) => item.from.getAsync((result) => resolve(result))),
+      new Promise((resolve) => item.getAttachmentsAsync((result) => resolve(result))),
+    ]);
+    const subject = subjectResult.value;
+    const body = bodyResult.value;
+    const recipients = recipientsResult.value.map((rec) => rec.emailAddress);
+    const cc = ccResult.value.map((rec) => rec.emailAddress);
+    const bcc = bccResult.value.map((rec) => rec.emailAddress);
+    const sender = senderResult.value.emailAddress;
+    const conversationId = item.conversationId;
+    const attachments = attachmentsResult.value;
+    console.log(body);
+    // console.log(attachments);
+    // console.log(Office.context.mailbox.userProfile.emailAddress);
+    const outgoingPayload = {
+      // message_id : item.id,
+      sender: sender,
+      subject: subject,
+      body: body,
+      recipients: recipients,
+      cc: cc,
+      bcc: bcc,
+      conv_id: conversationId,
+      attachments: attachments,
+      email_address:Office.context.mailbox.userProfile.emailAddress
+    };
 
-  return false;
-}
-
-function getAttachmentsCallback(asyncResult) {
-  const event = asyncResult.asyncContext;
-  if (asyncResult.value.length > 0) {
-    for (let i = 0; i < asyncResult.value.length; i++) {
-      if (asyncResult.value[i].isInline == false) {
-        event.completed({ allowEvent: true });
-        return;
-      }
-    }
-
-    event.completed({
-      allowEvent: false,
-      errorMessage: "Looks like the body of your message includes an image or an inline file. Attach a copy to the message before sending.",
-      // TIP: In addition to the formatted message, it's recommended to also set a
-      // plain text message in the errorMessage property for compatibility on
-      // older versions of Outlook clients.
-      errorMessageMarkdown: "Looks like the body of your message includes an image or an inline file. Attach a copy to the message before sending.\n\n**Tip**: For guidance on how to attach a file, see [Attach files in Outlook](https://www.contoso.com/help/attach-files-in-outlook)."
+    // Call the new backend endpoint for outgoing email validation
+    const response = await fetch(`${FLASK_BASE_URL}/validate_outgoing`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(outgoingPayload),
     });
-  } else {
-    event.completed({
-      allowEvent: false,
-      errorMessage: "Looks like you're forgetting to include an attachment.",
-      // TIP: In addition to the formatted message, it's recommended to also set a
-      // plain text message in the errorMessage property for compatibility on
-      // older versions of Outlook clients.
-      errorMessageMarkdown: "Looks like you're forgetting to include an attachment.\n\n**Tip**: For guidance on how to attach a file, see [Attach files in Outlook](https://www.contoso.com/help/attach-files-in-outlook)."
-    });
-  }
-}
-
-// function sendAnywayFunction(event) {
-//   // Hide the warning notification
-//   Office.context.mailbox.item.notificationMessages.removeAsync("warning");
-  
-//   // This will re-trigger the send event, but this time we let it go through.
-//   // The event object needs to be completed with allowEvent: true.
-//   // This is a simplified approach, in a real scenario you might need to
-//   // store the original event and complete it here.
-//   event.completed({ allowEvent: true });
-// }
-
-async function handleOutgoingEmail (event){
-    // Display a loading message in the Outlook UI
-    console.log("validating mail");
-    // console.log(event);
-    Office.context.mailbox.item.notificationMessages.addAsync("progress", {
-      type: "informationalMessage",
-      message: "Checking your email for potential issues...",
-      icon: "Icon.16x16",
-      persistent: false,
-    });
-    
-    try {
-      const item = Office.context.mailbox.item;
-    //   console.log(item);
-      const [
-            subjectResult, 
-            bodyResult, 
-            recipientsResult,
-            senderResult, 
-            attachmentsResult 
-        ] = await Promise.all([
-            new Promise(resolve => item.subject.getAsync(result => resolve(result))),
-            new Promise(resolve => item.body.getAsync(Office.CoercionType.Text, result => resolve(result))),
-            new Promise(resolve => item.to.getAsync(result => resolve(result))),
-            new Promise(resolve => item.from.getAsync(result => resolve(result))),
-            new Promise(resolve => item.getAttachmentsAsync(result => resolve(result))),
-        ]);
-        const subject = subjectResult.value;
-        const body = bodyResult.value;
-        const recipients = recipientsResult.value.map(rec => rec.emailAddress);
-        const sender = senderResult.value.emailAddress;
-        const conversationId = item.conversationId;
-        const attachments = attachmentsResult.value;
-    //   console.log("Subject:", subject);
-    //     console.log("Sender:", sender);
-    //     console.log("Conversation ID:", conversationId);
-    //   console.log("Recipients", recipients);
-    //   console.log("Body",body);
-    // console.log(attachments[0].name);
-    // console.log(Office.context.mailbox.userProfile);
-      const outgoingPayload = {
-        sende:sender,
-        subject: subject,
-        body: body,
-        recipients: recipients,
-        conv_id:conversationId,
-        attachments:attachments
-      };
-
-      // Call the new backend endpoint for outgoing email validation
-      const response = await fetch(`${FLASK_BASE_URL}/validate_outgoing`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(outgoingPayload),
-      });
-    //   console.log("Response")
-    //   console.log(response);
-      const result = await response.json();
-      Office.context.mailbox.item.notificationMessages.removeAsync("progress"); // Remove loading message
-
-      if (!response.ok) {
-        // Backend returned an error, assume fatal issue
-        Office.context.mailbox.item.notificationMessages.addAsync("error", {
-          type: "errorMessage",
-          message: `Backend validation failed: ${result.message}`,
-          icon: "Icon.32x32",
-          persistent: true,
-        });
-        event.completed({ allowEvent: false });
-        return;
-      }
-      
-      // Handle the validation result from the backend
-      if (result.status === "fatal") {
-        // A fatal issue was found, block the email and show the user the error
-        Office.context.mailbox.item.notificationMessages.addAsync("fatalIssue", {
-          type: "errorMessage",
-          message: `🚫 Cannot send: ${result.message}`,
-          icon: "Icon.32x32",
-          persistent: true,
-        });
-        event.completed({ allowEvent: false });
-      } else if (result.status === "warning") {
-        // A warning was found, show a notification with an option to send anyway
-        Office.context.mailbox.item.notificationMessages.addAsync("warning", {
-          type: "informationalMessage",
-          message: `⚠️ Warning: ${result.message}`,
-          icon: "Icon.16x16",
-          persistent: true,
-          actions: [
-            {
-              id: "sendAnyway",
-              label: "Send Anyway",
-              actionType: "executeFunction",
-              functionName: "sendAnywayFunction"
-            }
-          ]
-        });
-        
-        // This is a temporary placeholder. You'll need to define sendAnywayFunction
-        // in your `commands.js` to complete the send event.
-        event.completed({ allowEvent: false }); 
-      } else {
-        // No issues found, allow the email to be sent
-        event.completed({ allowEvent: true });
-    //     event.completed({
-    //   allowEvent: false,
-    //   errorMessage: "Testuing.",
-    //   // TIP: In addition to the formatted message, it's recommended to also set a
-    //   // plain text message in the errorMessage property for compatibility on
-    //   // older versions of Outlook clients.
-    //   errorMessageMarkdown: "Testing."
-    // });
-      }
-    } catch (error) {
-      console.error("Error during outgoing email validation:", error);
+    const result = await response.json();
+    const response_data_string = result.data;
+    //     // console.log(response_data_string);
+    const response_data = JSON.parse(response_data_string);
+    // console.log(response_data)
+    // const response_data = {};
+    if (response_data && Object.keys(response_data).length != 0) {
       Office.context.mailbox.item.notificationMessages.removeAsync("progress");
-      Office.context.mailbox.item.notificationMessages.addAsync("error", {
-        type: "errorMessage",
-        message: `An unexpected error occurred during validation: ${error.message}`,
-        icon: "Icon.32x32",
-        persistent: true,
+      let has_missing_attachments = response_data["attachments"]["has_missing_attachments"];
+      let is_best_practices_followed = response_data["best_practices"]["is_not_followed"];
+      let has_grmmatical_errors = response_data["grammatical_errors"]["has_errors"];
+      let has_sensitive_data = response_data["sensitive_data"]["has_sensitive_data"];
+      let has_spelling_mistakes = response_data["spelling_mistakes"]["has_mistakes"];
+
+      if (
+        has_missing_attachments ||
+        is_best_practices_followed ||
+        has_grmmatical_errors ||
+        has_sensitive_data ||
+        has_spelling_mistakes
+      ) {
+        sessionStorage.setItem("validationResult", JSON.stringify(response_data));
+        event.completed({
+          allowEvent: false,
+          errorMessage: "メール本文に誤りがあるようです。メールを送信する前に修正してください。",
+          cancelLabel: "詳細",
+          commandId: "composeOpenPaneButton",
+        });
+      }
+      event.completed({
+        allowEvent: true,
       });
-      event.completed({ allowEvent: true }); // Fail-safe: allow send on error
     }
-  };
+    event.completed({
+      allowEvent: false,
+      errorMessage: "データ処理中にエラーが発生しました。",
+      sendModeOverride: Office.MailboxEnums.SendModeOverride.PromptUser,
+    });
+  } catch (error) {
+    console.error("Error during outgoing email validation:", error);
+    // On unexpected errors, allow the email to be sent as a fail-safe.
+    Office.context.mailbox.item.notificationMessages.removeAsync("progress");
+    event.completed({ 
+        allowEvent: false, 
+        errorMessage: "送信メールの検証中にエラーが発生しました。", 
+        sendModeOverride: Office.MailboxEnums.SendModeOverride.PromptUser});
+  }
+}
 
 // Register the function with Outlook
 Office.actions.associate("onMessageSend", onMessageSend);

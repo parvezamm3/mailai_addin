@@ -17,3 +17,24 @@ export async function insertText(text) {
     console.log("Error: " + error);
   }
 }
+
+// Office.onReady((info) => {
+//     if (info.host === Office.HostType.Outlook) {
+//         const resultString = sessionStorage.getItem('validationResult');
+//         console.log(resultString)
+//         if (resultString) {
+//             const validationResult = JSON.parse(resultString);
+//             // Display the message in your React component based on the result
+//             if (validationResult.status === "fatal") {
+//                 // Show a fatal error message in your UI
+//             } else if (validationResult.status === "warning") {
+//                 // Show a warning and a "Send Anyway" button
+//             } else {
+//                 // Show a success message
+//                 console.log("success");
+//             }
+//             // Clear the stored data after using it
+//             sessionStorage.removeItem('validationResult');
+//         }
+//     }
+// });

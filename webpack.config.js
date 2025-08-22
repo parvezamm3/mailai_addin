@@ -20,8 +20,17 @@ module.exports = async (env, options) => {
     entry: {
       polyfill: ["core-js/stable", "regenerator-runtime/runtime"],
       react: ["react", "react-dom"],
+      // taskpane: {
+      //   import: ["./src/taskpane/index.jsx", "./src/taskpane/taskpane.html"],
+      //   dependOn: "react",
+      // },
       taskpane: {
-        import: ["./src/taskpane/index.jsx", "./src/taskpane/taskpane.html"],
+        import: ["./src/taskpane/index.jsx"],
+        dependOn: "react",
+      },
+      // New entry for the compose task pane
+      compose_taskpane: {
+        import: ["./src/taskpane/compose_taskpane.jsx"],
         dependOn: "react",
       },
       commands: "./src/commands/commands.js",
@@ -60,6 +69,11 @@ module.exports = async (env, options) => {
         filename: "taskpane.html",
         template: "./src/taskpane/taskpane.html",
         chunks: ["polyfill", "taskpane", "react"],
+      }),
+      new HtmlWebpackPlugin({
+        filename: "compose_taskpane.html", // This is your new task pane for compose
+        template: "./src/taskpane/compose_taskpane.html", // You'll need to create this file
+        chunks: ["polyfill", "compose_taskpane", "react"],
       }),
       new CopyWebpackPlugin({
         patterns: [
