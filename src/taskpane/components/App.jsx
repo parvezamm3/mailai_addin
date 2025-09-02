@@ -1,15 +1,5 @@
 import React, { useState, useEffect } from "react";
-import {
-  Panel,
-  Pivot,
-  PivotItem,
-  Spinner,
-  SpinnerSize,
-  Stack,
-  Text,
-  MessageBar,
-  MessageBarType,
-} from "@fluentui/react";
+import { Spinner, SpinnerSize, Stack, Text, MessageBar, MessageBarType } from "@fluentui/react";
 import ToggleSwitch from "./ToggleSwitch";
 import SuggestedReplies from "./SuggestedReplies";
 import { initializeIcons } from "@fluentui/react/lib/Icons";
@@ -22,8 +12,9 @@ const FLASK_BASE_URL = "https://equipped-externally-stud.ngrok-free.app";
 const App = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [analysisResult, setAnalysisResult] = useState("Loading analysis and preferences...");
-  const [importanceEnabled, setImportanceEnabled] = useState(false);
-  const [generationEnabled, setGenerationEnabled] = useState(false);
+  const [isGenerateImportance, setGenerateImportance] = useState(false);
+  const [isGenerateSummaryAndCategorize, setGenerateSummaryAndCategorize] = useState(false);
+  const [isGenerateReplies, setGenerateReplies] = useState(false);
   const [is_spam, set_is_spam] = useState(false);
   const [is_malicious, set_is_malicious] = useState(false);
   const [suggestedReplies, setSuggestedReplies] = useState([]);
@@ -130,27 +121,16 @@ const App = () => {
         // console.log(error);
       }
       item.body.getAsync(Office.CoercionType.Text, async (asyncResult) => {
-        // console.log("item.body.getAsync result status:", asyncResult.status);
+        console.log("item.body.getAsync result status:", asyncResult.status);
         if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
           const emailBody = asyncResult.value;
-          // console.log("Email Body successfully retrieved. Length:", emailBody.length);
-
-          // setEmailDetails({
-          //   subject: emailSubject,
-          //   body: emailBody,
-          //   sender: emailSender,
-          //   reciver:receiver,
-          //   convId: convId,
-          //   messageId: messageId,
-          //   userEmail: userEmail,
-          // });
 
           // --- Fetch analysis and preferences from Flask backend ---
           const payloadAnalysis = {
             user_id: userEmail,
             ownerEmail: ownerEmail,
-            platform: "outlook",
-            sender:emailSender,
+            provider: "outlook",
+            sender: emailSender,
             subject: emailSubject,
             body: emailBody,
             conv_id: convId,
@@ -163,7 +143,7 @@ const App = () => {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payloadAnalysis),
             });
-            console.log(responseAnalysis);
+            // console.log(responseAnalysis);
 
             // console.log("Flask analysis response status:", responseAnalysis.status);
             if (responseAnalysis.status === 401) {
@@ -174,20 +154,25 @@ const App = () => {
             } else if (responseAnalysis.ok) {
               const dataAnalysis = await responseAnalysis.json();
               // console.log("Flask analysis data received:", dataAnalysis);
-              setErrorMessage('');
+              setErrorMessage(dataAnalysis.message);
+              // console.log(dataAnalysis.message);
               set_is_spam(dataAnalysis.is_spam);
               set_is_malicious(dataAnalysis.is_malicious);
-              setAnalysisResult(dataAnalysis.analysis_result || "結果が返されませんでした");
+              setAnalysisResult(dataAnalysis.analysis_result || "結果が返されませんでした。");
+              // console.log(dataAnalysis.replies);
               setSuggestedReplies(dataAnalysis.replies);
               setCategory(dataAnalysis.category);
               setSummary(dataAnalysis.summary);
-              setImportanceEnabled(dataAnalysis.preferences?.enable_importance || false);
-              setGenerationEnabled(dataAnalysis.preferences?.enable_generation || false);
+              setGenerateImportance(
+                dataAnalysis.preferences?.enable_importance_generation || false
+              );
+              setGenerateSummaryAndCategorize(
+                dataAnalysis.preferences?.enable_summarization_and_categorization || false
+              );
+              setGenerateReplies(dataAnalysis.preferences?.enable_reply_generation || false);
             } else {
               const errorText = responseAnalysis.message;
-              setErrorMessage(
-                errorText
-              );
+              setErrorMessage(errorText);
               console.log("Error fetching dashboard data from Flask:", errorText);
             }
           } catch (error) {
@@ -299,23 +284,28 @@ const App = () => {
 
   const handleToggleChange = async (fieldName, isChecked) => {
     // console.log(`Toggle change detected: ${fieldName} to ${isChecked}`);
-    if (fieldName === "enable_importance") {
-      setImportanceEnabled(isChecked);
-    } else if (fieldName === "enable_generation") {
-      setGenerationEnabled(isChecked);
+    if (fieldName === "enable_importance_generation") {
+      setGenerateImportance(isChecked);
+    } else if (fieldName === "enable_summarization_and_categorization") {
+      setGenerateSummaryAndCategorize(isChecked);
+    } else if (fieldName === "enable_reply_generation") {
+      setGenerateReplies(isChecked);
     }
 
     const payload = {
       user_id: Office.context.mailbox.userProfile.emailAddress,
       platform: "outlook",
-      enable_importance: importanceEnabled,
-      enable_generation: generationEnabled,
+      enable_importance_generation: isGenerateImportance,
+      enable_summarization_and_categorization: isGenerateSummaryAndCategorize,
+      enable_reply_generation: isGenerateReplies,
     };
 
-    if (fieldName === "enable_importance") {
-      payload.enable_importance = isChecked;
-    } else if (fieldName === "enable_generation") {
-      payload.enable_generation = isChecked;
+    if (fieldName === "enable_importance_generation") {
+      payload.enable_importance_generation = isChecked;
+    } else if (fieldName === "enable_summarization_and_categorization") {
+      payload.enable_summarization_and_categorization = isChecked;
+    } else if (fieldName === "enable_reply_generation") {
+      payload.enable_reply_generation = isChecked;
     }
 
     // console.log("Saving preferences to Flask:", payload);
@@ -327,8 +317,10 @@ const App = () => {
       });
 
       if (!response.ok) {
-        if (fieldName === "enable_importance") setImportanceEnabled(!isChecked);
-        if (fieldName === "enable_generation") setGenerationEnabled(!isChecked);
+        if (fieldName === "enable_importance_generation") setGenerateImportance(!isChecked);
+        if (fieldName === "enable_summarization_and_categorization")
+          setGenerateSummaryAndCategorize(!isChecked);
+        if (fieldName === "enable_reply_generation") setGenerateReplies(!isChecked);
         const errorText = await response.text();
         // console.error("Failed to save preferences to Flask:", errorText);
         // Add a user-friendly notification if needed
@@ -336,55 +328,57 @@ const App = () => {
         console.log("Preferences successfully saved to Flask.");
       }
     } catch (error) {
-      if (fieldName === "enable_importance") setImportanceEnabled(!isChecked);
-      if (fieldName === "enable_generation") setGenerationEnabled(!isChecked);
+      if (fieldName === "enable_importance_generation") setGenerateImportance(!isChecked);
+      if (fieldName === "enable_summarization_and_categorization")
+        setGenerateSummaryAndCategorize(!isChecked);
+      if (fieldName === "enable_reply_generation") setGenerateReplies(!isChecked);
       console.error("Network error saving preferences:", error);
       // Add a user-friendly notification if needed
     }
   };
 
-  const getSuggestedReplies = async (item, userEmail) => {
-    const SUGGEST_REPLY_URL = `${FLASK_BASE_URL}/suggest_reply`;
-    let fetchedReplies = [];
-    // console.log("Initiating getSuggestedReplies...");
+  // const getSuggestedReplies = async (item, userEmail) => {
+  //   const SUGGEST_REPLY_URL = `${FLASK_BASE_URL}/suggest_reply`;
+  //   let fetchedReplies = [];
+  //   // console.log("Initiating getSuggestedReplies...");
 
-    try {
+  //   try {
 
-      const payload = {
-        user_id: userEmail,
-        conv_id: item.conversationId,
-        message_id: item.itemId,
-      };
-      // console.log("Sending reply suggestion request to Flask:", payload);
+  //     const payload = {
+  //       user_id: userEmail,
+  //       conv_id: item.conversationId,
+  //       message_id: item.itemId,
+  //     };
+  //     // console.log("Sending reply suggestion request to Flask:", payload);
 
-      const response = await fetch(SUGGEST_REPLY_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+  //     const response = await fetch(SUGGEST_REPLY_URL, {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify(payload),
+  //     });
 
-      // console.log("Flask reply suggestion response status:", response.status);
-      if (response.ok) {
-        const data = await response.json();
-        // console.log("Flask reply suggestion data received:", data);
-        if (data.suggested_replies && Array.isArray(data.suggested_replies)) {
-          fetchedReplies = data.suggested_replies;
-          setCategory(data.category);
-        } else {
-          console.warn("Backend did not return an array of suggested replies in expected format.");
-        }
-      } else {
-        const errorText = await response.text();
-        console.error(
-          `Error fetching suggested replies from backend (${response.status}): ${errorText}`
-        );
-      }
-    } catch (error) {
-      console.error("Network error fetching suggested replies:", error);
-    }
-    // console.log("Finished getSuggestedReplies. Found:", fetchedReplies.length, "replies.");
-    return fetchedReplies;
-  };
+  //     // console.log("Flask reply suggestion response status:", response.status);
+  //     if (response.ok) {
+  //       const data = await response.json();
+  //       // console.log("Flask reply suggestion data received:", data);
+  //       if (data.suggested_replies && Array.isArray(data.suggested_replies)) {
+  //         fetchedReplies = data.suggested_replies;
+  //         setCategory(data.category);
+  //       } else {
+  //         console.warn("Backend did not return an array of suggested replies in expected format.");
+  //       }
+  //     } else {
+  //       const errorText = await response.text();
+  //       console.error(
+  //         `Error fetching suggested replies from backend (${response.status}): ${errorText}`
+  //       );
+  //     }
+  //   } catch (error) {
+  //     console.error("Network error fetching suggested replies:", error);
+  //   }
+  //   // console.log("Finished getSuggestedReplies. Found:", fetchedReplies.length, "replies.");
+  //   return fetchedReplies;
+  // };
 
   const handleRefresh = () => {
     console.log("Refresh button clicked. Reloading email details...");
@@ -400,6 +394,34 @@ const App = () => {
     Office.context.mailbox.item.displayReplyForm(replyOptions);
     // Office.context.mailbox.item.displayReplyForm(replyText);
   };
+
+  async function setNotMalicious() {
+    const item = Office.context.mailbox.item;
+    const messageId = item.itemId;
+    const convId = item.conversationId;
+    const userEmail = Office.context.mailbox.userProfile.emailAddress;
+    const payload = {
+      user_email: userEmail,
+      conv_id: convId,
+      message_id: messageId,
+      platform: "outlook",
+    };
+
+    try {
+      const response = await fetch(`${FLASK_BASE_URL}/not_malicious`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        handleRefresh();
+      }
+    } catch (error) {
+      console.error("Network error during setNotMalicious method:", error);
+      // Add a user-friendly notification if needed
+    }
+  }
 
   if (isLoading) {
     return (
@@ -436,12 +458,12 @@ const App = () => {
         コンテンツをリフレッシュ
       </button>
       {errorMessage && (
-            <>
-              <Stack>
-                <MessageBar messageBarType={MessageBarType.error}>{errorMessage}</MessageBar>
-              </Stack>
-            </>
-          )}
+        <>
+          <Stack>
+            <MessageBar messageBarType={MessageBarType.error}>{errorMessage}</MessageBar>
+          </Stack>
+        </>
+      )}
 
       {/* Conditional Rendering based on Authorization */}
       {isAuthorized ? (
@@ -457,13 +479,20 @@ const App = () => {
             </Text>
             <ToggleSwitch
               label="重要度分析"
-              checked={importanceEnabled}
-              onToggle={(checked) => handleToggleChange("enable_importance", checked)}
+              checked={isGenerateImportance}
+              onToggle={(checked) => handleToggleChange("enable_importance_generation", checked)}
             />
             <ToggleSwitch
-              label="返信と要約の生成"
-              checked={generationEnabled}
-              onToggle={(checked) => handleToggleChange("enable_generation", checked)}
+              label="要約を生成と分類"
+              checked={isGenerateSummaryAndCategorize}
+              onToggle={(checked) =>
+                handleToggleChange("enable_summarization_and_categorization", checked)
+              }
+            />
+            <ToggleSwitch
+              label="返信生成"
+              checked={isGenerateReplies}
+              onToggle={(checked) => handleToggleChange("enable_reply_generation", checked)}
             />
           </Stack>
 
@@ -473,7 +502,7 @@ const App = () => {
           </Text>
           {!is_spam && !is_malicious ? (
             <>
-              {importanceEnabled && (
+              {isGenerateImportance && (
                 <Stack
                   tokens={{ childrenGap: 10, padding: 15 }}
                   styles={{ root: { border: "1px solid #ccccccff", borderRadius: 8 } }}
@@ -481,8 +510,7 @@ const App = () => {
                   <FormattedText text={analysisResult} />
                 </Stack>
               )}
-
-              {generationEnabled && (
+              {isGenerateSummaryAndCategorize && (
                 <>
                   <p>
                     <b>カテゴリー</b> : {category}
@@ -491,14 +519,23 @@ const App = () => {
                     <b>要約 : </b>
                     {summary}{" "}
                   </p>
-                  <SuggestedReplies replies={suggestedReplies} onReplyClick={handleReplyClick} />
                 </>
+              )}
+
+              {isGenerateReplies && (
+                // <>
+
+                <SuggestedReplies replies={suggestedReplies} onReplyClick={handleReplyClick} />
+                // </>
               )}
             </>
           ) : (
-            <MessageBar messageBarType={MessageBarType.error}>
-              このメールはスパムまたは悪意のあるコンテンツとして検出されました。
-            </MessageBar>
+            <>
+              <MessageBar messageBarType={MessageBarType.error}>
+                このメールはスパムまたは悪意のあるコンテンツとして検出されました。
+              </MessageBar>
+              <button onClick={setNotMalicious}>安全そうに見える</button>
+            </>
           )}
         </>
       ) : (

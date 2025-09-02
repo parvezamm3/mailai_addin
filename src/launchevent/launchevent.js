@@ -1,8 +1,10 @@
 const FLASK_BASE_URL = "https://equipped-externally-stud.ngrok-free.app";
 function onMessageSend(event) {
   // sessionStorage.setItem('validationResult', JSON.stringify({ status: "loading", message: "Checking your email for potential issues..." }));
+  console.log("Get Item : ",sessionStorage.getItem("sendAnyway"))
   if (sessionStorage.getItem("sendAnyway") === "true") {
     sessionStorage.removeItem("sendAnyway"); // Clean up the flag
+    console.log("Cleaned Item : ",sessionStorage.getItem("sendAnyway"))
     event.completed({ allowEvent: true }); // Allow the send to proceed
     return;
   }
