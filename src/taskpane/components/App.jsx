@@ -11,30 +11,24 @@ const FLASK_BASE_URL = "https://equipped-externally-stud.ngrok-free.app";
 
 const App = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const [analysisResult, setAnalysisResult] = useState("Loading analysis and preferences...");
   const [isGenerateImportance, setGenerateImportance] = useState(false);
-  const [isGenerateSummaryAndCategorize, setGenerateSummaryAndCategorize] = useState(false);
   const [isGenerateReplies, setGenerateReplies] = useState(false);
-  const [is_spam, set_is_spam] = useState(false);
-  const [is_malicious, set_is_malicious] = useState(false);
+  const [isSpam, setIsSpam] = useState(false);
+  const [isAnalysisNeeded, setIsAnalysisNeeded] = useState(true);
+  const [isPromotional, setIsPromotional] = useState(false);
+  const [statusMessage, setStatusMessage] = useState();
+  const [importanceScore, setImportanceScore] = useState();
+  const [importanceDescription, setImportanceDescription] = useState();
   const [suggestedReplies, setSuggestedReplies] = useState([]);
-  const [category, setCategory] = useState("");
+  const [categories, setCategories] = useState([]);
   const [summary, setSummary] = useState("");
-  // const [emailDetails, setEmailDetails] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [isAuthorized, setIsAuthorized] = useState(true);
-
-  // const [outgoingValidation, setOutgoingValidation] = useState(null); // NEW state for outgoing validation
+  const [ownerEmail, setOwnerEmail] = useState("");
 
   useEffect(() => {
-    // Expose the function globally so the commands.js handler can call it
-
-    // console.log("App component mounted. Calling Office.onReady...");
     Office.onReady((info) => {
       // Log all properties of the info object for detailed debugging
-      // console.log("Office.onReady fired. info object:", info);
-
-      // Changed condition: Only check for host type. If onReady fires, it's generally initialized enough.
       if (info.host === Office.HostType.Outlook) {
         // console.log("Office host is Outlook. Loading email details...");
         loadEmailDetails();
@@ -57,7 +51,7 @@ const App = () => {
         }
       } else {
         console.log("Add-in not running in Outlook. Displaying fallback message.");
-        setAnalysisResult("This add-on is designed for Outlook. Please open it within Outlook.");
+        // setAnalysisResult("This add-on is designed for Outlook. Please open it within Outlook.");
         setIsLoading(false);
       }
     });
@@ -87,7 +81,7 @@ const App = () => {
   }, []);
 
   const loadEmailDetails = async () => {
-    // console.log("loadEmailDetails function started.");
+    console.log("loadEmailDetails function started.");
     setIsLoading(true); // Ensure loading state is active
     setIsAuthorized(true); // Assume authorized until proven otherwise
     try {
@@ -98,37 +92,40 @@ const App = () => {
         console.log("No mail item found. Setting analysis result and ending loading.");
         setErrorMessage("このアドオンの機能を使用するには、メールを開いてください。");
         setIsLoading(false);
-        // setIsAuthorized(false);
         return;
       }
-      // for
-      // console.log(item.to);
       const emailSubject = item.subject;
       const emailSender = item.sender.emailAddress;
       const messageId = item.itemId;
       const convId = item.conversationId;
       const userEmail = Office.context.mailbox.userProfile.emailAddress;
-      let ownerEmail = userEmail;
+      let tempOwnerEmail = userEmail;
       try {
         Office.context.mailbox.item.getSharedPropertiesAsync((asyncResult) => {
           if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
             // The method succeeded, so the item is in a shared mailbox or shared folder.
+            // console.log("Getting result");
             const sharedProperties = asyncResult.value;
-            ownerEmail = sharedProperties.owner;
+            tempOwnerEmail = sharedProperties.owner;
+            // console.log("After async");
+            console.log(userEmail, tempOwnerEmail);
           }
         });
       } catch (error) {
         // console.log(error);
       }
+      // console.log(userEmail, tempOwnerEmail);
       item.body.getAsync(Office.CoercionType.Text, async (asyncResult) => {
         console.log("item.body.getAsync result status:", asyncResult.status);
         if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
           const emailBody = asyncResult.value;
-
+          // console.log(userEmail, tempOwnerEmail);
+          // console.log("Inside body");
+          setOwnerEmail(tempOwnerEmail);
           // --- Fetch analysis and preferences from Flask backend ---
           const payloadAnalysis = {
             user_id: userEmail,
-            ownerEmail: ownerEmail,
+            ownerEmail: tempOwnerEmail,
             provider: "outlook",
             sender: emailSender,
             subject: emailSubject,
@@ -136,7 +133,6 @@ const App = () => {
             conv_id: convId,
             message_id: messageId,
           };
-          // console.log("Sending analysis request to Flask:", payloadAnalysis);
           try {
             const responseAnalysis = await fetch(`${FLASK_BASE_URL}/dashboard_data`, {
               method: "POST",
@@ -144,37 +140,43 @@ const App = () => {
               body: JSON.stringify(payloadAnalysis),
             });
             // console.log(responseAnalysis);
+            const dataAnalysis = await responseAnalysis.json();
+            setStatusMessage(dataAnalysis.status_message);
+            // console.log(dataAnalysis.status_message);
+            // if (responseAnalysis.status === 202) {
 
-            // console.log("Flask analysis response status:", responseAnalysis.status);
+            //   console.log(dataAnalysis);
+            // }
             if (responseAnalysis.status === 401) {
               const errorText = await responseAnalysis.text();
               console.warn(`User not authorized. Displaying authorization prompt.: ${errorText}`);
               setIsAuthorized(false); // Set authorization to false
               setErrorMessage("AI 機能にアクセスするには承認が必要です。");
-            } else if (responseAnalysis.ok) {
-              const dataAnalysis = await responseAnalysis.json();
-              // console.log("Flask analysis data received:", dataAnalysis);
+            } else if (responseAnalysis.status === 200) {
+              // const dataAnalysis = await responseAnalysis.json();
               setErrorMessage(dataAnalysis.message);
-              // console.log(dataAnalysis.message);
-              set_is_spam(dataAnalysis.is_spam);
-              set_is_malicious(dataAnalysis.is_malicious);
-              setAnalysisResult(dataAnalysis.analysis_result || "結果が返されませんでした。");
-              // console.log(dataAnalysis.replies);
+              setIsAnalysisNeeded(dataAnalysis.is_analysis_needed);
+              setIsSpam(dataAnalysis.is_spam);
+              // console.log(isSpam);
+              setIsPromotional(dataAnalysis.is_promotional);
+              setImportanceScore(dataAnalysis.importance_score);
+              setImportanceDescription(dataAnalysis.importance_description);
+
               setSuggestedReplies(dataAnalysis.replies);
-              setCategory(dataAnalysis.category);
+              console.log(Object.keys(dataAnalysis.replies).length);
+              setCategories(dataAnalysis.categories);
               setSummary(dataAnalysis.summary);
               setGenerateImportance(
                 dataAnalysis.preferences?.enable_importance_generation || false
               );
-              setGenerateSummaryAndCategorize(
-                dataAnalysis.preferences?.enable_summarization_and_categorization || false
-              );
+
               setGenerateReplies(dataAnalysis.preferences?.enable_reply_generation || false);
-            } else {
-              const errorText = responseAnalysis.message;
-              setErrorMessage(errorText);
-              console.log("Error fetching dashboard data from Flask:", errorText);
             }
+            // else {
+            //   const errorText = responseAnalysis.message;
+            //   setErrorMessage(errorText);
+            //   console.log("Error fetching dashboard data:", errorText);
+            // }
           } catch (error) {
             setErrorMessage(`分析のためにバックエンドに接続できませんでした: ${error.message}`);
             console.error("Network error during analysis fetch:", error);
@@ -191,103 +193,16 @@ const App = () => {
       });
     } catch (error) {
       console.error("General error in loadEmailDetails:", error);
-      setAnalysisResult(`予期しないエラーが発生しました: ${error.message}`);
+      // setAnalysisResult(`予期しないエラーが発生しました: ${error.message}`);
       setIsLoading(false);
       setIsAuthorized(false);
     }
   };
 
-  // const generateAnalysis = async () => {
-  //   try {
-  //     const item = Office.context.mailbox.item;
-  //     const messageId = item.itemId;
-  //     const convId = item.conversationId;
-  //     const userEmail = Office.context.mailbox.userProfile.emailAddress;
-  //     let ownerEmail = userEmail;
-  //     try {
-  //       Office.context.mailbox.item.getSharedPropertiesAsync((asyncResult) => {
-  //       if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
-  //         // The method succeeded, so the item is in a shared mailbox or shared folder.
-  //         const sharedProperties = asyncResult.value;
-  //         ownerEmail = sharedProperties.owner;
-  //       }
-  //     });
-  //     } catch (error) {
-  //       console.log(error);
-  //     }
-  //     item.body.getAsync(Office.CoercionType.Text, async (asyncResult) => {
-  //       // console.log("item.body.getAsync result status:", asyncResult.status);
-  //       if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
-  //         const emailBody = asyncResult.value;
-
-  //         // --- Fetch analysis and preferences from Flask backend ---
-  //         const payloadAnalysis = {
-  //           ownerEmail:ownerEmail,
-  //           message_id: messageId,
-  //         };
-  //         // console.log("Sending analysis request to Flask:", payloadAnalysis);
-  //         try {
-  //           const responseAnalysis = await fetch(`${FLASK_BASE_URL}/generate_analysis_outlook`, {
-  //             method: "POST",
-  //             headers: { "Content-Type": "application/json" },
-  //             body: JSON.stringify(payloadAnalysis),
-  //           });
-
-  //           if (responseAnalysis.ok) {
-  //             const dataAnalysis = await responseAnalysis.json();
-  //             // console.log("Flask analysis data received:", dataAnalysis);
-  //             set_is_spam(dataAnalysis.is_spam);
-  //             set_is_malicious(dataAnalysis.is_malicious);
-  //             setAnalysisResult(
-  //               dataAnalysis.analysis_result || "結果が返されませんでした"
-  //             );
-  //           } else {
-  //             const errorText = await responseAnalysis.text();
-  //             setAnalysisResult(`Error from backend (${responseAnalysis.status}): ${errorText}`);
-  //             console.error("Error fetching dashboard data from Flask:", errorText);
-  //           }
-  //         } catch (error) {
-  //           setAnalysisResult(`Failed to connect to backend for analysis: ${error.message}`);
-  //           console.error("Network error during analysis fetch:", error);
-  //         }
-
-  //         // Only fetch replies if authorized
-  //         if (isAuthorized) {
-  //           // Check isAuthorized *after* the dashboard_data fetch
-  //           // console.log("Fetching suggested replies...");
-  //           const replies = await getSuggestedReplies(
-  //             item,
-  //             ownerEmail
-  //           );
-  //           setSuggestedReplies(replies);
-  //           // console.log("Suggested replies state updated. Count:", replies.length);
-  //         } else {
-  //           setSuggestedReplies([]); // Clear replies if not authorized
-  //         }
-
-  //         setIsLoading(false);
-  //         console.log("isLoading set to false. UI should now fully render.");
-  //       } else {
-  //         // Handle error if email body cannot be retrieved
-  //         setAnalysisResult(`Error retrieving email body: ${asyncResult.error.message}`);
-  //         console.error("Error in item.body.getAsync:", asyncResult.error);
-  //         setIsLoading(false);
-  //       }
-  //     });
-  //   } catch (error) {
-  //     console.error("General error in loadEmailDetails:", error);
-  //     setAnalysisResult(`An unexpected error occurred: ${error.message}`);
-  //     setIsLoading(false);
-  //     setIsAuthorized(false);
-  //   }
-  // }
-
   const handleToggleChange = async (fieldName, isChecked) => {
     // console.log(`Toggle change detected: ${fieldName} to ${isChecked}`);
     if (fieldName === "enable_importance_generation") {
       setGenerateImportance(isChecked);
-    } else if (fieldName === "enable_summarization_and_categorization") {
-      setGenerateSummaryAndCategorize(isChecked);
     } else if (fieldName === "enable_reply_generation") {
       setGenerateReplies(isChecked);
     }
@@ -296,14 +211,11 @@ const App = () => {
       user_id: Office.context.mailbox.userProfile.emailAddress,
       platform: "outlook",
       enable_importance_generation: isGenerateImportance,
-      enable_summarization_and_categorization: isGenerateSummaryAndCategorize,
       enable_reply_generation: isGenerateReplies,
     };
 
     if (fieldName === "enable_importance_generation") {
       payload.enable_importance_generation = isChecked;
-    } else if (fieldName === "enable_summarization_and_categorization") {
-      payload.enable_summarization_and_categorization = isChecked;
     } else if (fieldName === "enable_reply_generation") {
       payload.enable_reply_generation = isChecked;
     }
@@ -318,67 +230,17 @@ const App = () => {
 
       if (!response.ok) {
         if (fieldName === "enable_importance_generation") setGenerateImportance(!isChecked);
-        if (fieldName === "enable_summarization_and_categorization")
-          setGenerateSummaryAndCategorize(!isChecked);
         if (fieldName === "enable_reply_generation") setGenerateReplies(!isChecked);
-        const errorText = await response.text();
-        // console.error("Failed to save preferences to Flask:", errorText);
-        // Add a user-friendly notification if needed
+        // const errorText = await response.text();
       } else {
         console.log("Preferences successfully saved to Flask.");
       }
     } catch (error) {
       if (fieldName === "enable_importance_generation") setGenerateImportance(!isChecked);
-      if (fieldName === "enable_summarization_and_categorization")
-        setGenerateSummaryAndCategorize(!isChecked);
       if (fieldName === "enable_reply_generation") setGenerateReplies(!isChecked);
       console.error("Network error saving preferences:", error);
-      // Add a user-friendly notification if needed
     }
   };
-
-  // const getSuggestedReplies = async (item, userEmail) => {
-  //   const SUGGEST_REPLY_URL = `${FLASK_BASE_URL}/suggest_reply`;
-  //   let fetchedReplies = [];
-  //   // console.log("Initiating getSuggestedReplies...");
-
-  //   try {
-
-  //     const payload = {
-  //       user_id: userEmail,
-  //       conv_id: item.conversationId,
-  //       message_id: item.itemId,
-  //     };
-  //     // console.log("Sending reply suggestion request to Flask:", payload);
-
-  //     const response = await fetch(SUGGEST_REPLY_URL, {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify(payload),
-  //     });
-
-  //     // console.log("Flask reply suggestion response status:", response.status);
-  //     if (response.ok) {
-  //       const data = await response.json();
-  //       // console.log("Flask reply suggestion data received:", data);
-  //       if (data.suggested_replies && Array.isArray(data.suggested_replies)) {
-  //         fetchedReplies = data.suggested_replies;
-  //         setCategory(data.category);
-  //       } else {
-  //         console.warn("Backend did not return an array of suggested replies in expected format.");
-  //       }
-  //     } else {
-  //       const errorText = await response.text();
-  //       console.error(
-  //         `Error fetching suggested replies from backend (${response.status}): ${errorText}`
-  //       );
-  //     }
-  //   } catch (error) {
-  //     console.error("Network error fetching suggested replies:", error);
-  //   }
-  //   // console.log("Finished getSuggestedReplies. Found:", fetchedReplies.length, "replies.");
-  //   return fetchedReplies;
-  // };
 
   const handleRefresh = () => {
     console.log("Refresh button clicked. Reloading email details...");
@@ -395,20 +257,49 @@ const App = () => {
     // Office.context.mailbox.item.displayReplyForm(replyText);
   };
 
-  async function setNotMalicious() {
+  async function toggleAnalysisNeeded(isChecked, ownerEmail) {
     const item = Office.context.mailbox.item;
     const messageId = item.itemId;
     const convId = item.conversationId;
-    const userEmail = Office.context.mailbox.userProfile.emailAddress;
     const payload = {
-      user_email: userEmail,
+      user_email: ownerEmail,
       conv_id: convId,
       message_id: messageId,
+      is_analysis_needed: isChecked,
       platform: "outlook",
     };
 
     try {
-      const response = await fetch(`${FLASK_BASE_URL}/not_malicious`, {
+      const response = await fetch(`${FLASK_BASE_URL}/set_analysis_needed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        handleRefresh();
+        console.log(payload);
+      }
+    } catch (error) {
+      console.error("Network error during toggleAnalysisNeeded method:", error);
+      // Add a user-friendly notification if needed
+    }
+  }
+
+  async function toggleIsPromotional(isChecked, ownerEmail) {
+    const item = Office.context.mailbox.item;
+    const messageId = item.itemId;
+    const convId = item.conversationId;
+    const payload = {
+      user_email: ownerEmail,
+      conv_id: convId,
+      message_id: messageId,
+      is_promotional: isChecked,
+      platform: "outlook",
+    };
+
+    try {
+      const response = await fetch(`${FLASK_BASE_URL}/set_is_promotional`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -418,7 +309,36 @@ const App = () => {
         handleRefresh();
       }
     } catch (error) {
-      console.error("Network error during setNotMalicious method:", error);
+      console.error("Network error during toggleIsPromotional method:", error);
+      // Add a user-friendly notification if needed
+    }
+  }
+
+  async function toggleIsSpam(isChecked, ownerEmail) {
+    const item = Office.context.mailbox.item;
+    const messageId = item.itemId;
+    const convId = item.conversationId;
+    const payload = {
+      user_email: ownerEmail,
+      conv_id: convId,
+      message_id: messageId,
+      is_spam: isChecked,
+      platform: "outlook",
+    };
+    // console.log(payload);
+
+    try {
+      const response = await fetch(`${FLASK_BASE_URL}/set_is_spam`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        handleRefresh();
+      }
+    } catch (error) {
+      console.error("Network error during toggleIsSpam method:", error);
       // Add a user-friendly notification if needed
     }
   }
@@ -446,9 +366,9 @@ const App = () => {
 
   return (
     <Stack tokens={{ childrenGap: 20 }} styles={{ root: { padding: 20 } }}>
-      <Text variant="xxLarge" styles={{ root: { fontWeight: "bold" } }}>
+      {/* <Text variant="xxLarge" styles={{ root: { fontWeight: "bold" } }}>
         MailAI
-      </Text>
+      </Text> */}
       <Text variant="medium">メールを分析して返信の提案を得る</Text>
       {/* Refresh Button */}
       <button
@@ -469,72 +389,101 @@ const App = () => {
       {isAuthorized ? (
         <>
           {/* Feature Control Section */}
+          <Stack horizontal tokens={{ childrenGap: 5 }}>
+            {/* First Column */}
+            <Stack
+              tokens={{ childrenGap: 5, padding: 5 }}
+              styles={{ root: { border: "1px solid #ccc", borderRadius: 8 } }}
+            >
+              <Text variant="large" styles={{ root: { fontWeight: "bold" } }}>
+                機能
+              </Text>
+              <ToggleSwitch
+                label="重要度分析"
+                checked={isGenerateImportance}
+                onToggle={(checked) => handleToggleChange("enable_importance_generation", checked)}
+              />
+              <ToggleSwitch
+                label="返信生成"
+                checked={isGenerateReplies}
+                onToggle={(checked) => handleToggleChange("enable_reply_generation", checked)}
+              />
+            </Stack>
 
-          <Stack
-            tokens={{ childrenGap: 10, padding: 15 }}
-            styles={{ root: { border: "1px solid #ccc", borderRadius: 8 } }}
-          >
-            <Text variant="large" styles={{ root: { fontWeight: "bold" } }}>
-              機能
-            </Text>
-            <ToggleSwitch
-              label="重要度分析"
-              checked={isGenerateImportance}
-              onToggle={(checked) => handleToggleChange("enable_importance_generation", checked)}
-            />
-            <ToggleSwitch
-              label="要約を生成と分類"
-              checked={isGenerateSummaryAndCategorize}
-              onToggle={(checked) =>
-                handleToggleChange("enable_summarization_and_categorization", checked)
-              }
-            />
-            <ToggleSwitch
-              label="返信生成"
-              checked={isGenerateReplies}
-              onToggle={(checked) => handleToggleChange("enable_reply_generation", checked)}
-            />
+            {/* Second Column (Empty example, but you can add your content here) */}
+            <Stack
+              tokens={{ childrenGap: 5, padding: 5 }}
+              styles={{ root: { border: "1px solid #ccc", borderRadius: 8 } }}
+            >
+              <Text variant="medium" styles={{ root: { fontWeight: "bold" } }}>
+                フィードバック
+              </Text>
+              <ToggleSwitch
+                label="分析必要"
+                checked={isAnalysisNeeded}
+                onToggle={(checked) => toggleAnalysisNeeded(checked, ownerEmail)}
+              />
+              <ToggleSwitch
+                label="スパム"
+                checked={isSpam}
+                onToggle={(checked) => toggleIsSpam(checked, ownerEmail)}
+              />
+              <ToggleSwitch
+                label="プロモーション"
+                checked={isPromotional}
+                onToggle={(checked) => toggleIsPromotional(checked, ownerEmail)}
+              />
+              {/* Add more content, like another set of toggles or controls */}
+            </Stack>
           </Stack>
 
           {/* Analysis Result Section */}
           <Text variant="large" styles={{ root: { fontWeight: "bold" } }}>
             分析
           </Text>
-          {!is_spam && !is_malicious ? (
+          {statusMessage && statusMessage != "分析は正常に完了しました。" && (
             <>
-              {isGenerateImportance && (
-                <Stack
-                  tokens={{ childrenGap: 10, padding: 15 }}
-                  styles={{ root: { border: "1px solid #ccccccff", borderRadius: 8 } }}
-                >
-                  <FormattedText text={analysisResult} />
-                </Stack>
-              )}
-              {isGenerateSummaryAndCategorize && (
-                <>
+              <Stack>
+                <MessageBar messageBarType={MessageBarType.info}>{statusMessage}</MessageBar>
+              </Stack>
+            </>
+          )}
+          {!isSpam && (
+            <>
+              {categories && categories.length > 0 && (
+                <Stack>
                   <p>
-                    <b>カテゴリー</b> : {category}
+                    <b>カテゴリー</b> : {categories.join(", ")}
                   </p>
                   <p>
                     <b>要約 : </b>
                     {summary}{" "}
                   </p>
-                </>
+                </Stack>
               )}
 
-              {isGenerateReplies && (
+              {isGenerateImportance && importanceScore && (
+                <Stack
+                  tokens={{ childrenGap: 10, padding: 15 }}
+                  styles={{ root: { border: "1px solid #ccccccff", borderRadius: 8 } }}
+                >
+                  <p>
+                    <b>重要度スコア</b> : {importanceScore}
+                  </p>
+                  <p>
+                    <b>説明 : </b>
+                    {importanceDescription}
+                  </p>
+                  {/* <FormattedText text={analysisResult} /> */}
+                </Stack>
+              )}
+
+              {isGenerateReplies && Object.keys(suggestedReplies).length > 0 && (
                 // <>
 
                 <SuggestedReplies replies={suggestedReplies} onReplyClick={handleReplyClick} />
                 // </>
               )}
-            </>
-          ) : (
-            <>
-              <MessageBar messageBarType={MessageBarType.error}>
-                このメールはスパムまたは悪意のあるコンテンツとして検出されました。
-              </MessageBar>
-              <button onClick={setNotMalicious}>安全そうに見える</button>
             </>
           )}
         </>

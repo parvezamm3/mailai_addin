@@ -1,10 +1,10 @@
 const FLASK_BASE_URL = "https://equipped-externally-stud.ngrok-free.app";
 function onMessageSend(event) {
   // sessionStorage.setItem('validationResult', JSON.stringify({ status: "loading", message: "Checking your email for potential issues..." }));
-  console.log("Get Item : ",sessionStorage.getItem("sendAnyway"))
+  // console.log("Get Item : ", sessionStorage.getItem("sendAnyway"));
   if (sessionStorage.getItem("sendAnyway") === "true") {
     sessionStorage.removeItem("sendAnyway"); // Clean up the flag
-    console.log("Cleaned Item : ",sessionStorage.getItem("sendAnyway"))
+    // console.log("Cleaned Item : ", sessionStorage.getItem("sendAnyway"));
     event.completed({ allowEvent: true }); // Allow the send to proceed
     return;
   }
@@ -13,7 +13,7 @@ function onMessageSend(event) {
 
 async function handleOutgoingEmail(event) {
   // Display a loading message in the Outlook UI
-//   console.log("validating mail");
+  // console.log("validating mail");
   // console.log(event);
   Office.context.mailbox.item.notificationMessages.addAsync("progress", {
     type: "informationalMessage",
@@ -25,7 +25,7 @@ async function handleOutgoingEmail(event) {
 
   try {
     const item = Office.context.mailbox.item;
-      // console.log(item);
+    // console.log(item);
     const [
       subjectResult,
       bodyResult,
@@ -37,7 +37,11 @@ async function handleOutgoingEmail(event) {
     ] = await Promise.all([
       new Promise((resolve) => item.subject.getAsync((result) => resolve(result))),
       new Promise((resolve) =>
-        item.body.getAsync(Office.CoercionType.Text, { bodyMode: Office.MailboxEnums.BodyMode.HostConfig }  , (result) => resolve(result))
+        item.body.getAsync(
+          Office.CoercionType.Text,
+          { bodyMode: Office.MailboxEnums.BodyMode.HostConfig },
+          (result) => resolve(result)
+        )
       ),
       new Promise((resolve) => item.to.getAsync((result) => resolve(result))),
       new Promise((resolve) => item.cc.getAsync((result) => resolve(result))),
@@ -61,13 +65,14 @@ async function handleOutgoingEmail(event) {
       sender: sender,
       subject: subject,
       body: body,
-      recipients: recipients,
-      cc: cc,
-      bcc: bcc,
+      recipients: recipients.toString(),
+      cc: cc.toString(),
+      bcc: bcc.toString(),
       conv_id: conversationId,
-      attachments: attachments,
-      email_address:Office.context.mailbox.userProfile.emailAddress
+      attachments: attachments.toString(),
+      email_address: Office.context.mailbox.userProfile.emailAddress,
     };
+    // console.log(outgoingPayload);
 
     // Call the new backend endpoint for outgoing email validation
     const response = await fetch(`${FLASK_BASE_URL}/validate_outgoing`, {
@@ -77,7 +82,7 @@ async function handleOutgoingEmail(event) {
     });
     const result = await response.json();
     const response_data_string = result.data;
-    //     // console.log(response_data_string);
+    // console.log(response_data_string);
     const response_data = JSON.parse(response_data_string);
     // console.log(response_data)
     // const response_data = {};
@@ -88,6 +93,7 @@ async function handleOutgoingEmail(event) {
       let has_grmmatical_errors = response_data["grammatical_errors"]["has_errors"];
       let has_sensitive_data = response_data["sensitive_data"]["has_sensitive_data"];
       let has_spelling_mistakes = response_data["spelling_mistakes"]["has_mistakes"];
+      // console.log(response_data["corrected_version"]);
 
       if (
         has_missing_attachments ||
@@ -117,10 +123,11 @@ async function handleOutgoingEmail(event) {
     console.error("Error during outgoing email validation:", error);
     // On unexpected errors, allow the email to be sent as a fail-safe.
     Office.context.mailbox.item.notificationMessages.removeAsync("progress");
-    event.completed({ 
-        allowEvent: false, 
-        errorMessage: "送信メールの検証中にエラーが発生しました。", 
-        sendModeOverride: Office.MailboxEnums.SendModeOverride.PromptUser});
+    event.completed({
+      allowEvent: false,
+      errorMessage: "送信メールの検証中にエラーが発生しました。",
+      sendModeOverride: Office.MailboxEnums.SendModeOverride.PromptUser,
+    });
   }
 }
 
