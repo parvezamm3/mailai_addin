@@ -2,13 +2,13 @@
 
 このプロジェクトは、React で構築された Outlook アドインです。Outlook 内でタスクペインのインターフェースを提供します。
 
------
+---
 
 ## インストール
 
 1.  **リポジトリをクローンする:**
     ```bash
-    git clone https://github.com/parvezamm3/mailai_addin.git
+    git clone git@gitlab.com:parvez427/mailai-addin.git
     ```
 2.  **プロジェクトディレクトリに移動する:**
     ```bash
@@ -19,7 +19,7 @@
     npm install
     ```
 
------
+---
 
 ## 開始方法
 
@@ -32,12 +32,11 @@
     このコマンドを実行すると、開発サーバーが起動し、アドインがサイドロードされた状態で Outlook が自動的に開きます。
 
 2.  **Outlook でアドインを開く:**
-
-      * Outlook で、メールを開きます。
-      * 「アプリ」ボタンをクリックします。
-      * 「MailAI」を選択して、アドインを開きます。
-
+    - Outlook で、メールを開きます。
+    - 「アプリ」ボタンをクリックします。
+    - 「MailAI」を選択して、アドインを開きます。
 
 ## 承認
+
 Flask バックエンドに、メールを自動的に読み込むための Graph API 権限を承認するには、この URL を使用してください。
-    ([https://equipped-externally-stud.ngrok-free.app/outlook-oauth2callback](https://equipped-externally-stud.ngrok-free.app/outlook-oauth2callback))
+([https://equipped-externally-stud.ngrok-free.app/outlook-oauth2callback](https://equipped-externally-stud.ngrok-free.app/outlook-oauth2callback))
